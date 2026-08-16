@@ -45,6 +45,17 @@ unrelated `python.exe`.
 them. That is deliberate: it will not run `git reset --hard` or `git clean` on
 your behalf. `git stash push -m "before update"` or commit, then retry.
 
+**`START_AV_DASHBOARD.bat` seems to hang when you pipe its output**
+Launching normally — double-click, or run it in a terminal — returns in a few
+seconds and leaves the backend running. But piping its output, as in
+`START_AV_DASHBOARD.bat | tee log.txt`, appears to hang: the backend is started
+as a detached hidden process and inherits the pipe handle, so the pipe stays open
+even though the script has finished.
+
+The application is running normally; only your pipe is waiting. Check with
+`Invoke-RestMethod http://127.0.0.1:8000/health`. The script already writes full
+logs to `.runtime\logs\`, so piping is rarely needed.
+
 **A script aborts immediately after a command that clearly worked**
 This was a real bug, now fixed, and worth recognising if you extend the scripts:
 in Windows PowerShell 5.1, redirecting a native command's stderr with `2>&1`
