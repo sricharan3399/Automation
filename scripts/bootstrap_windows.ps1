@@ -20,6 +20,7 @@
 [CmdletBinding()]
 param(
     [switch]$NoStart,        # set up but do not launch
+    [switch]$NoBrowser,      # launch, but do not open a browser (headless / CI)
     [switch]$Force,          # reinstall and rebuild even if inputs are unchanged
     [switch]$SkipDashboard,  # skip Node install and the frontend build
     [switch]$NoShortcut
@@ -275,5 +276,10 @@ if ($NoStart) {
 }
 
 Write-Banner 'STARTING THE DASHBOARD'
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'start_dashboard.ps1')
+$startScript = Join-Path $PSScriptRoot 'start_dashboard.ps1'
+if ($NoBrowser) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startScript -NoBrowser
+} else {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startScript
+}
 exit $LASTEXITCODE
