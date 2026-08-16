@@ -230,3 +230,6 @@ different answer on every run. That exact bug is what this test was written to c
 **Dashboard import fails with `@/…` unresolved**
 The alias must be declared in both `tsconfig.json` (`paths`) and `vite.config.ts`
 (`resolve.alias`). Both are configured; if you add another alias, add it to both.
+
+<!-- deployment update path verified -->
+
