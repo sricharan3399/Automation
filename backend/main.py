@@ -17,8 +17,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import text
 
 from backend.api import ROUTERS, ws
@@ -163,46 +162,65 @@ def create_app() -> FastAPI:
     return app
 
 
+def _dashboard_not_built_response() -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": {
+                "message": "The dashboard has not been built yet.",
+                "cause": (
+                    "dashboard/dist is not committed to git, so a fresh clone has to build it. "
+                    "That build needs Node.js 18+; if npm was missing when SETUP_AND_START.bat "
+                    "ran, setup warned and continued without a dashboard."
+                ),
+                "fix": [
+                    "node --version   (if this fails, install Node.js 18+ from nodejs.org)",
+                    "open a NEW terminal so PATH is refreshed",
+                    "cd dashboard",
+                    "npm ci",
+                    "npm run build",
+                    "then reload this page - no restart needed",
+                ],
+                "api_is_available": True,
+                "api_docs": "/api/docs",
+            }
+        },
+    )
+
+
 def _mount_dashboard(app: FastAPI) -> None:
-    """Serve the built dashboard, or an actionable placeholder when absent."""
-    index = DASHBOARD_DIST / "index.html"
-    if index.is_file():
-        assets = DASHBOARD_DIST / "assets"
-        if assets.is_dir():
-            app.mount("/assets", StaticFiles(directory=assets), name="assets")
+    """Serve the built dashboard, deciding per request rather than at startup.
 
-        @app.get("/{full_path:path}", include_in_schema=False)
-        async def spa(full_path: str) -> FileResponse:
+    An earlier version chose its routes once, when the app object was created.
+    If the backend happened to start before ``npm run build`` had produced
+    ``dashboard/dist`` - which is what happens on a fresh clone on a machine
+    without Node.js - it served the "not built" placeholder for the entire life
+    of the process. Building the dashboard afterwards appeared to do nothing,
+    because the routes were already fixed. That cost three separate debugging
+    rounds, all of which ended in "restart it".
+
+    Checking at request time costs one ``is_file()`` per request and makes the
+    server recover on its own the moment the build lands. ``StaticFiles`` is
+    deliberately not mounted, because mounting requires the directory to exist
+    at startup - the very assumption that caused the problem.
+    """
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa(full_path: str) -> Response:
+        index = DASHBOARD_DIST / "index.html"
+        if not index.is_file():
+            return _dashboard_not_built_response()
+
+        root = DASHBOARD_DIST.resolve()
+        if full_path:
             candidate = (DASHBOARD_DIST / full_path).resolve()
-            if (
-                full_path
-                and str(candidate).startswith(str(DASHBOARD_DIST.resolve()))
-                and candidate.is_file()
-            ):
+            # Path-traversal guard: `is_relative_to` compares path components,
+            # so it cannot be fooled by a sibling directory whose name merely
+            # starts with the same characters as dist/.
+            if candidate.is_relative_to(root) and candidate.is_file():
                 return FileResponse(candidate)
-            # Client-side routing: unknown paths fall through to the SPA shell.
-            return FileResponse(index)
-
-        return
-
-    @app.get("/", include_in_schema=False)
-    async def not_built() -> JSONResponse:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "detail": {
-                    "message": "The dashboard has not been built yet.",
-                    "fix": [
-                        "cd dashboard",
-                        "npm install",
-                        "npm run build",
-                        "then restart the application",
-                    ],
-                    "api_is_available": True,
-                    "api_docs": "/api/docs",
-                }
-            },
-        )
+        # Client-side routing: unknown paths fall through to the SPA shell.
+        return FileResponse(index)
 
 
 app = create_app()

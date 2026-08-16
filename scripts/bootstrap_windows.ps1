@@ -31,6 +31,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location (Get-RepoRoot)
 
+# Set when something prevents the dashboard being built. common.ps1 enables
+# StrictMode, so this must exist before any read of it.
+$script:DashboardBlocked = $null
+
 $logFile = Initialize-Log -Name 'setup'
 Write-Banner 'AV TEST AUTOMATION DASHBOARD - FIRST TIME SETUP'
 Write-Host "Repository: $(Get-RepoRoot)"
@@ -169,8 +173,12 @@ if (-not $dashboardPossible) {
     if ($SkipDashboard) {
         Write-Skip 'Skipped by -SkipDashboard'
     } elseif (-not $npm) {
+        # Recorded now, reported as a hard failure at the end of setup. A
+        # warning here is not enough: it scrolls past, setup reports success,
+        # and the tester discovers the problem as a JSON error page in the
+        # browser with no obvious connection to a missing Node.js.
+        $script:DashboardBlocked = 'Node.js / npm was not found on PATH.'
         Write-WarnMsg 'npm was not found. Install Node.js 18+ to build the dashboard.'
-        Write-WarnMsg 'The backend API remains fully usable at /api/docs.'
     }
 } else {
     $nodeHash = Get-NodeDependencyHash
@@ -208,8 +216,9 @@ $distIndex = Join-Path $dashboardDir 'dist\index.html'
 if (-not $dashboardPossible) {
     if (Test-Path $distIndex) {
         Write-Skip 'Using the existing dashboard build'
+        $script:DashboardBlocked = $null   # an existing build is good enough
     } else {
-        Write-WarnMsg 'The dashboard is not built. The API works; the UI will not be served.'
+        Write-WarnMsg 'The dashboard is not built. The UI cannot be served.'
     }
 } else {
     $sourceHash = Get-FrontendSourceHash
@@ -273,6 +282,32 @@ Write-Stage '9/9  Finishing setup'
 $state.setup_completed = $true
 Save-SetupState $state
 Write-Ok "Setup state saved to $(Get-StateFile)"
+
+# The dashboard is the product. Finishing without one is a failed setup, and
+# saying so here - with the remedy - is the difference between a clear message
+# and a tester meeting a raw JSON error page in the browser.
+if ($script:DashboardBlocked) {
+    Write-Host ''
+    Write-Banner 'SETUP INCOMPLETE - THE DASHBOARD WAS NOT BUILT'
+    Write-Host ''
+    Write-Host "  Reason:" -ForegroundColor Yellow
+    Write-Host "    $($script:DashboardBlocked)" -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host '  dashboard/dist is not stored in git, so a fresh clone must build it,' -ForegroundColor Gray
+    Write-Host '  and that build needs Node.js. Without it the backend starts but the' -ForegroundColor Gray
+    Write-Host '  browser shows "The dashboard has not been built yet".' -ForegroundColor Gray
+    Write-Host ''
+    Write-Host '  To fix:' -ForegroundColor Cyan
+    Write-Host '    1. Install Node.js 18 or newer from https://nodejs.org' -ForegroundColor Cyan
+    Write-Host '       (or run:  winget install OpenJS.NodeJS.LTS)' -ForegroundColor Cyan
+    Write-Host '    2. Close this window and open a NEW terminal so PATH refreshes' -ForegroundColor Cyan
+    Write-Host '    3. Check it worked:  node --version' -ForegroundColor Cyan
+    Write-Host '    4. Run SETUP_AND_START.bat again' -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '  The backend API is usable meanwhile at http://localhost:8000/api/docs' -ForegroundColor Gray
+    Write-Host ''
+    exit 1
+}
 
 if (-not $NoShortcut) {
     try {
