@@ -38,6 +38,23 @@ $venvPython = Get-VenvPython
 $pidFile = Get-BackendPidFile
 
 # ---------------------------------------------------------------------------
+# Serialise starts
+# ---------------------------------------------------------------------------
+# Without this, two launchers a second apart both saw a free port (neither
+# backend had bound yet), both spawned one, and the second overwrote the PID
+# file - orphaning a live backend that STOP could never identify or kill.
+# Double-clicking the shortcut twice is enough to trigger it, because the
+# console shows nothing for the first few seconds.
+$startLock = Enter-StartLock -TimeoutSeconds 120
+if (-not $startLock) {
+    Write-StageFailure -Stage 'Startup checks' -Command 'acquire start lock' `
+        -Detail 'Another start is already in progress for this repository. Wait for it to finish, or run STOP_AV_DASHBOARD.bat first.'
+    exit 1
+}
+
+try {
+
+# ---------------------------------------------------------------------------
 # Already running?
 # ---------------------------------------------------------------------------
 Write-Stage 'Checking for a running instance'
@@ -71,11 +88,6 @@ if (-not (Test-Path $venvPython)) {
 Write-Ok 'Virtual environment present'
 
 $state = Get-SetupState
-if (-not $state.setup_completed) {
-    Write-StageFailure -Stage 'Startup checks' -Command 'setup state' `
-        -Detail 'Setup has not completed on this machine. Run SETUP_AND_START.bat first.'
-    exit 1
-}
 
 # Fail fast on a broken environment rather than during request handling.
 # Invoke-Native, not `2>&1`: a failing import writes a traceback to stderr, which
@@ -115,6 +127,29 @@ if (Test-Path $distIndex) {
 } else {
     Write-WarnMsg 'The dashboard is not built. The API will start; the UI will not be served.'
     Write-WarnMsg 'Run SETUP_AND_START.bat, or `npm run build` in dashboard\, to build it.'
+}
+
+# Reality beats bookkeeping.
+#
+# The checks above are the real preconditions. setup_state.json is only a record
+# of them, and it can legitimately lag behind: UPDATE_AND_START performs the same
+# work as setup, and an interrupted setup can leave the flag unset on a machine
+# that is nonetheless fully installed.
+#
+# Refusing to start a working installation because of a stale flag was a real
+# failure. So the flag is repaired from observed reality rather than trusted over
+# it. A genuinely missing prerequisite has already failed above, with a message
+# naming what to do.
+if (-not $state.setup_completed) {
+    Write-WarnMsg 'Setup was not recorded as complete, but every prerequisite is satisfied'
+    Write-Host '    Repairing the recorded setup state and continuing.' -ForegroundColor DarkGray
+    $state.setup_completed       = $true
+    $state.backend_dependencies  = $true
+    $state.database_initialized  = $true
+    $state.frontend_built        = (Test-Path $distIndex)
+    $state.frontend_dependencies = (Test-Path (Join-Path (Get-DashboardDir) 'node_modules'))
+    Save-SetupState $state
+    Write-Ok 'Setup state repaired'
 }
 
 # ---------------------------------------------------------------------------
@@ -182,6 +217,28 @@ Write-Ok "Health check passed (status: $($health.payload.status), version $($hea
 Write-Host ("    {0,-24} {1}" -f 'database', $health.payload.database) -ForegroundColor DarkGray
 Write-Host ("    {0,-24} {1}" -f 'dashboard', $health.payload.dashboard) -ForegroundColor DarkGray
 
+# A health check proves *something* is serving the port, not that it is ours.
+# Confirm the listener is the process we launched, so we never report success
+# for our own dying backend while an untracked instance holds the port.
+$ownerPid = Get-PortOwnerPid -Port $port
+if ($ownerPid -and $ownerPid -ne $process.Id) {
+    $ourTree = $false
+    try {
+        $child = Get-CimInstance Win32_Process -Filter "ProcessId = $ownerPid" -ErrorAction Stop
+        if ($child -and $child.ParentProcessId -eq $process.Id) { $ourTree = $true }
+    } catch {
+        $ourTree = $false
+    }
+    if (-not $ourTree) {
+        Stop-TrackedProcess -PidFile $pidFile -Label 'backend' | Out-Null
+        Write-StageFailure -Stage 'Health check' -Command "verify listener on port $port" `
+            -Detail "Port $port is served by process $ownerPid, which is not the backend this script started (PID $($process.Id)). Another instance is already running. Run STOP_AV_DASHBOARD.bat, or set AV_PORT in .env to use a different port."
+        exit 1
+    }
+} elseif (-not $ownerPid) {
+    Write-Host '    (listener ownership could not be verified on this system)' -ForegroundColor DarkGray
+}
+
 # ---------------------------------------------------------------------------
 # Browser
 # ---------------------------------------------------------------------------
@@ -203,3 +260,9 @@ Write-Host ''
 Write-Host '  Stop with:  STOP_AV_DASHBOARD.bat'
 Write-Host ''
 exit 0
+
+}
+finally {
+    # Released on every path, including the `exit` calls above.
+    Exit-StartLock -Mutex $startLock
+}

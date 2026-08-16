@@ -15,15 +15,19 @@ echo No data source is contacted during setup.
 echo.
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\bootstrap_windows.ps1" %*
+rem Captured immediately, and compared numerically. `if errorlevel N` means
+rem ">= N", so it cannot see the negative codes Windows returns for Ctrl+C
+rem (-1073741510) or an access violation - both were reported as success.
+set "EXITCODE=%ERRORLEVEL%"
 
-if errorlevel 1 (
+if not "%EXITCODE%"=="0" (
     echo.
-    echo Setup failed.
+    echo Setup failed with exit code %EXITCODE%.
     echo Review the setup log for more information:
     echo   .runtime\logs\setup.log
     echo.
     pause
-    exit /b 1
+    exit /b %EXITCODE%
 )
 
 echo.

@@ -57,8 +57,11 @@ if (-not (Test-Path $venvPython)) {
 # 1. Security audit (blocking)
 # ---------------------------------------------------------------------------
 Write-Stage '1/7  Repository security audit'
-& $venvPython (Join-Path $PSScriptRoot 'repository_audit.py') 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Host
-Set-Result -Name 'Security audit' -Passed ($LASTEXITCODE -eq 0) -Security
+# Invoke-Native everywhere below: Tee-Object -FilePath writes UTF-16LE in
+# Windows PowerShell 5.1, which corrupted these logs.
+$auditScript = Join-Path $PSScriptRoot 'repository_audit.py'
+$auditCode = Invoke-Native -Action { & $venvPython $auditScript } -LogPath $logFile
+Set-Result -Name 'Security audit' -Passed ($auditCode -eq 0) -Security
 
 # ---------------------------------------------------------------------------
 # 2. .gitignore sanity (blocking)
@@ -84,19 +87,19 @@ if ($SkipTests) {
     Write-Skip 'Skipped by -SkipTests'
     $results['Backend tests'] = @{ passed = $true; detail = 'skipped' }
 } else {
-    & $venvPython -m pytest -q 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Host
-    Set-Result -Name 'Backend tests' -Passed ($LASTEXITCODE -eq 0)
+    $pytestCode = Invoke-Native -Action { & $venvPython -m pytest -q } -LogPath $logFile
+    Set-Result -Name 'Backend tests' -Passed ($pytestCode -eq 0)
 }
 
 # ---------------------------------------------------------------------------
 # 4. Lint and type check
 # ---------------------------------------------------------------------------
 Write-Stage '4/7  Backend lint and type check'
-& $venvPython -m ruff check . 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Null
-Set-Result -Name 'Backend lint (ruff)' -Passed ($LASTEXITCODE -eq 0)
+$ruffCode = Invoke-Native -Action { & $venvPython -m ruff check . } -LogPath $logFile -Quiet
+Set-Result -Name 'Backend lint (ruff)' -Passed ($ruffCode -eq 0)
 
-& $venvPython -m mypy 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Null
-Set-Result -Name 'Backend types (mypy)' -Passed ($LASTEXITCODE -eq 0)
+$mypyCode = Invoke-Native -Action { & $venvPython -m mypy } -LogPath $logFile -Quiet
+Set-Result -Name 'Backend types (mypy)' -Passed ($mypyCode -eq 0)
 
 # ---------------------------------------------------------------------------
 # 5. Frontend tests
@@ -113,10 +116,8 @@ if (-not $npm -or -not (Test-Path (Join-Path $dashboardDir 'node_modules'))) {
 } else {
     Push-Location $dashboardDir
     try {
-        npm test 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Host
-        $testCode = $LASTEXITCODE
-        npm run lint 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Null
-        $lintCode = $LASTEXITCODE
+        $testCode = Invoke-Native -Action { npm test } -LogPath $logFile
+        $lintCode = Invoke-Native -Action { npm run lint } -LogPath $logFile -Quiet
     } finally { Pop-Location }
     Set-Result -Name 'Dashboard tests' -Passed ($testCode -eq 0)
     Set-Result -Name 'Dashboard lint' -Passed ($lintCode -eq 0)
@@ -131,9 +132,9 @@ if ($SkipBuild -or -not $npm -or -not (Test-Path (Join-Path $dashboardDir 'node_
     $results['Dashboard build'] = @{ passed = $true; detail = 'skipped' }
 } else {
     Push-Location $dashboardDir
-    try { npm run build 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Null } finally { Pop-Location }
+    try { $buildCode = Invoke-Native -Action { npm run build } -LogPath $logFile -Quiet } finally { Pop-Location }
     $built = Test-Path (Join-Path $dashboardDir 'dist\index.html')
-    Set-Result -Name 'Dashboard build' -Passed ($LASTEXITCODE -eq 0 -and $built)
+    Set-Result -Name 'Dashboard build' -Passed ($buildCode -eq 0 -and $built)
 }
 
 # ---------------------------------------------------------------------------

@@ -161,19 +161,36 @@ function Invoke-Native {
     )
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
+
+    # Deliberately NOT Tee-Object. In Windows PowerShell 5.1 Tee-Object -FilePath
+    # writes UTF-16LE regardless of what the rest of the file is, so it corrupted
+    # every diagnostic log the failure messages tell users to read. A StreamWriter
+    # pinned to UTF-8 (no BOM, since Initialize-Log already wrote one) keeps the
+    # log readable, and is far faster than Add-Content per line for pip and npm
+    # output that runs to thousands of lines.
+    $writer = $null
+    if ($LogPath) {
+        try {
+            $writer = New-Object System.IO.StreamWriter($LogPath, $true, (New-Object System.Text.UTF8Encoding($false)))
+        } catch {
+            $writer = $null  # logging must never break the command it is logging
+        }
+    }
+
     try {
         $global:LASTEXITCODE = 0
-        if ($LogPath) {
-            if ($Quiet) {
-                & $Action 2>&1 | Tee-Object -FilePath $LogPath -Append | Out-Null
+        & $Action 2>&1 | ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) {
+                $line = $_.ToString()
             } else {
-                & $Action 2>&1 | Tee-Object -FilePath $LogPath -Append | Out-Host
+                $line = [string]$_
             }
-        } else {
-            if ($Quiet) { & $Action 2>&1 | Out-Null } else { & $Action 2>&1 | Out-Host }
+            if ($writer) { $writer.WriteLine($line) }
+            if (-not $Quiet) { Write-Host $line }
         }
         return $LASTEXITCODE
     } finally {
+        if ($writer) { $writer.Flush(); $writer.Dispose() }
         $ErrorActionPreference = $previous
     }
 }
@@ -389,13 +406,25 @@ function Save-TrackedProcess {
     )
     $dir = Split-Path -Parent $PidFile
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+
+    # .StartTime throws on an already-exited process, which is reachable when a
+    # backend dies immediately (a port race, a broken venv). Losing the identity
+    # stamp is survivable; crashing the launcher is not.
+    $started = ''
+    $image = ''
+    try { $started = $Process.StartTime.ToString('o') } catch { $started = '' }
+    try { $image = $Process.Path } catch { $image = '' }
+
     $record = [ordered]@{
         pid        = $Process.Id
-        started_at = $Process.StartTime.ToString('o')
-        image      = $Process.Path
+        started_at = $started
+        image      = $image
         repo_root  = $script:RepoRoot
     }
-    ($record | ConvertTo-Json) | Set-Content -Path $PidFile -Encoding utf8
+    # Written atomically: a half-written PID file is the fault repaired above.
+    $temp = "$PidFile.tmp"
+    ($record | ConvertTo-Json) | Set-Content -Path $temp -Encoding utf8
+    Move-Item -LiteralPath $temp -Destination $PidFile -Force
 }
 
 <#
@@ -408,10 +437,24 @@ function Get-TrackedProcess {
     param([string]$PidFile)
     if (-not (Test-Path $PidFile)) { return $null }
 
+    # A truncated or malformed PID file must degrade to "not tracked", never
+    # throw. Set-Content truncates before writing, so any interruption during
+    # Save-TrackedProcess leaves a zero-byte file - and under Set-StrictMode,
+    # touching a property of the resulting $null once crashed start, stop,
+    # update AND validate, leaving the dashboard both unstartable and
+    # unstoppable. The guards therefore live INSIDE the try.
+    $record = $null
     try {
-        $record = Get-Content $PidFile -Raw -Encoding utf8 | ConvertFrom-Json
+        $raw = Get-Content $PidFile -Raw -Encoding utf8 -ErrorAction Stop
+        if (-not $raw -or -not $raw.Trim()) { return $null }
+        $record = $raw | ConvertFrom-Json
     } catch {
         return $null
+    }
+
+    if (-not $record) { return $null }
+    foreach ($key in @('pid', 'started_at', 'repo_root')) {
+        if (-not ($record.PSObject.Properties.Name -contains $key)) { return $null }
     }
     if (-not $record.pid) { return $null }
 
@@ -419,11 +462,16 @@ function Get-TrackedProcess {
     if (-not $process) { return $null }
 
     # Start time must match: a recycled PID belongs to a different process.
-    try {
-        $recorded = [datetime]::Parse($record.started_at)
-        if ([math]::Abs(($process.StartTime - $recorded).TotalSeconds) -gt 2) { return $null }
-    } catch {
-        return $null
+    # An empty stamp means Save-TrackedProcess could not read it; fall through to
+    # the command-line check, which is the stronger identity test anyway, rather
+    # than declaring our own process untrackable and therefore unstoppable.
+    if ($record.started_at) {
+        try {
+            $recorded = [datetime]::Parse($record.started_at)
+            if ([math]::Abs(($process.StartTime - $recorded).TotalSeconds) -gt 2) { return $null }
+        } catch {
+            return $null
+        }
     }
 
     # And it must be this repository's interpreter running this application.
@@ -528,6 +576,70 @@ function Wait-ForHealth {
         Start-Sleep -Milliseconds 800
     }
     return @{ healthy = $false; reason = "The backend did not become healthy within $TimeoutSeconds seconds." }
+}
+
+<#
+Serialise starts across processes.
+
+Two launchers started seconds apart both saw a free port (neither backend had
+bound yet), both spawned a backend, and the second overwrote the PID file - so
+the surviving backend became untracked and STOP could never kill it. The lock
+covers the whole check-then-bind window, which is the only way to close that
+race.
+
+The name is derived from the repository path, so two checkouts on one machine
+do not block each other.
+#>
+function Enter-StartLock {
+    param([int]$TimeoutSeconds = 120)
+    $key = (Get-RepoRoot).ToLower()
+    $stream = [System.IO.MemoryStream]::new([System.Text.Encoding]::UTF8.GetBytes($key))
+    try {
+        $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash.Substring(0, 16)
+    } finally {
+        $stream.Dispose()
+    }
+
+    $mutex = New-Object System.Threading.Mutex($false, "Local\av-dashboard-start-$hash")
+    $acquired = $false
+    try {
+        $acquired = $mutex.WaitOne([TimeSpan]::FromSeconds($TimeoutSeconds))
+    } catch [System.Threading.AbandonedMutexException] {
+        # The previous holder died without releasing. We now own it.
+        $acquired = $true
+    }
+    if (-not $acquired) {
+        $mutex.Dispose()
+        return $null
+    }
+    return $mutex
+}
+
+function Exit-StartLock {
+    param($Mutex)
+    if (-not $Mutex) { return }
+    try { $Mutex.ReleaseMutex() } catch { }
+    try { $Mutex.Dispose() } catch { }
+}
+
+<#
+Which process is actually listening on a port.
+
+Used to prove that the backend answering the health check is the one we just
+started, rather than a leftover instance or an unrelated program. A health check
+against a port cannot, by itself, tell those apart.
+#>
+function Get-PortOwnerPid {
+    param([int]$Port)
+    try {
+        $connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
+                      Select-Object -First 1
+        if ($connection) { return [int]$connection.OwningProcess }
+    } catch {
+        # Get-NetTCPConnection is absent on some SKUs; ownership simply cannot be
+        # verified there, and the caller treats that as "unknown", not "wrong".
+    }
+    return $null
 }
 
 function Test-PortFree {

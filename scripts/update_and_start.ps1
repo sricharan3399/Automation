@@ -28,6 +28,21 @@ $venvPython = Get-VenvPython
 $state = Get-SetupState
 
 # ---------------------------------------------------------------------------
+# 0. Installed at all?
+# ---------------------------------------------------------------------------
+# Guarded here rather than failing deep inside step 6 with a confusing
+# "term is not recognized" error when $venvPython does not exist.
+if (-not (Test-Path $venvPython)) {
+    Write-StageFailure -Stage 'Update' -Command '.venv\Scripts\python.exe' `
+        -Detail 'This machine has no installation to update. Run SETUP_AND_START.bat first.'
+    exit 1
+}
+
+# Update never created these, so deleting .runtime (which TROUBLESHOOTING calls
+# safe) made the database backup throw a raw exception mid-update.
+Initialize-RuntimeDirectories | Out-Null
+
+# ---------------------------------------------------------------------------
 # 1. Git availability and repository
 # ---------------------------------------------------------------------------
 Write-Stage '1/8  Checking the repository'
@@ -91,7 +106,10 @@ $remoteRef = "origin/$branch"
 $verifyCode = Invoke-Native -Action { git rev-parse --verify $remoteRef } -Quiet
 if ($verifyCode -ne 0) {
     Write-WarnMsg "Branch '$branch' does not exist on origin. Nothing to update."
-    if (-not $NoStart) { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'start_dashboard.ps1') }
+    # Do not leak git's exit code here: `rev-parse --verify` returning 128 is the
+    # expected outcome on this path, and reporting it as a failed update was wrong.
+    if ($NoStart) { exit 0 }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'start_dashboard.ps1')
     exit $LASTEXITCODE
 }
 $remoteCommit = (git rev-parse $remoteRef).Trim()
@@ -135,7 +153,14 @@ Write-Stage '6/8  Applying dependency changes'
 $pythonHash = Get-PythonDependencyHash
 $storedPythonHash = ''
 if ($state.hashes.ContainsKey('python')) { $storedPythonHash = $state.hashes['python'] }
-if ($pythonHash -ne $storedPythonHash) {
+
+# A matching hash proves the dependency FILES did not change - not that the
+# packages are still installed. Corroborate with reality, as bootstrap does.
+$pyProbe = Invoke-Native -Action { & $venvPython -c "import fastapi, uvicorn, sqlalchemy, shapely, yaml, pydantic" } -Quiet
+$pyOk = ($pyProbe -eq 0)
+
+if ($pythonHash -ne $storedPythonHash -or -not $pyOk) {
+    if (-not $pyOk) { Write-Host '    Installed packages missing or broken; reinstalling' -ForegroundColor Gray }
     Write-Host '    Python dependencies changed; reinstalling' -ForegroundColor Gray
     $requirements = 'requirements-dev.txt'
     if (-not (Test-Path (Join-Path (Get-RepoRoot) $requirements))) { $requirements = 'requirements.txt' }
@@ -157,8 +182,13 @@ if ($npm -and (Test-Path (Join-Path $dashboardDir 'package.json'))) {
     $nodeHash = Get-NodeDependencyHash
     $storedNodeHash = ''
     if ($state.hashes.ContainsKey('node')) { $storedNodeHash = $state.hashes['node'] }
-    if ($nodeHash -ne $storedNodeHash) {
-        Write-Host '    Dashboard lockfile changed; reinstalling' -ForegroundColor Gray
+    $modulesPresent = Test-Path (Join-Path $dashboardDir 'node_modules')
+    if ($nodeHash -ne $storedNodeHash -or -not $modulesPresent) {
+        if (-not $modulesPresent) {
+            Write-Host '    node_modules is missing; reinstalling' -ForegroundColor Gray
+        } else {
+            Write-Host '    Dashboard lockfile changed; reinstalling' -ForegroundColor Gray
+        }
         Push-Location $dashboardDir
         try {
             if (Test-Path 'package-lock.json') {
@@ -189,9 +219,23 @@ Write-Stage '7/8  Database and dashboard build'
 $databaseFile = Join-Path (Get-RepoRoot) 'data\local.db'
 if (Test-Path $databaseFile) {
     $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-    $backup = Join-Path (Get-BackupDir) "database_$stamp.db"
-    Copy-Item $databaseFile $backup -ErrorAction SilentlyContinue
-    Write-Ok "Database backed up to $(Split-Path -Leaf $backup)"
+    $backupDir = Get-BackupDir
+    if (-not (Test-Path $backupDir)) { New-Item -ItemType Directory -Path $backupDir -Force | Out-Null }
+    $backup = Join-Path $backupDir "database_$stamp.db"
+
+    # Verify rather than assert. This previously printed "Database backed up"
+    # unconditionally, so a failed copy still read as success immediately before
+    # a schema change ran.
+    try {
+        Copy-Item $databaseFile $backup -ErrorAction Stop
+    } catch {
+        Write-WarnMsg "Database backup failed: $($_.Exception.Message)"
+    }
+    if (Test-Path $backup) {
+        Write-Ok "Database backed up to $(Split-Path -Leaf $backup)"
+    } else {
+        Write-WarnMsg 'Proceeding without a database backup; the schema step is additive and does not drop data'
+    }
 }
 # init-db is idempotent: it creates missing tables and seeds absent built-ins,
 # and never overwrites existing rows.
@@ -237,6 +281,21 @@ if ($smokeCode -ne 0) {
     exit 1
 }
 Write-Ok 'Application imports cleanly'
+
+# Record what this run actually verified.
+#
+# Previously only the dependency hashes were written back, so a successful
+# update left setup_completed false and the next start refused to launch a
+# working installation. An update that reaches this point has installed
+# dependencies, migrated the database, built the dashboard and proved the
+# application imports - which is precisely what "setup completed" means.
+$state.setup_completed       = $true
+$state.backend_dependencies  = $true
+$state.database_initialized  = $true
+$state.frontend_dependencies = (Test-Path (Join-Path $dashboardDir 'node_modules'))
+$state.frontend_built        = (Test-Path (Join-Path $dashboardDir 'dist\index.html'))
+Save-SetupState $state
+Write-Ok 'Setup state recorded'
 
 if ($pulled) { Write-Ok 'Update applied' } else { Write-Ok 'No changes were pulled' }
 

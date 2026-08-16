@@ -14,7 +14,8 @@ echo dataset. No data source is contacted.
 echo.
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\prepare_repository.ps1" %*
-set EXITCODE=%ERRORLEVEL%
+rem Numeric comparison, not `if errorlevel`: see SETUP_AND_START.bat.
+set "EXITCODE=%ERRORLEVEL%"
 
 if "%EXITCODE%"=="1" (
     echo.
@@ -30,6 +31,16 @@ if "%EXITCODE%"=="2" (
     echo.
     pause
     exit /b 2
+)
+
+rem Catch-all so an unexpected or negative code is never reported as success.
+if not "%EXITCODE%"=="0" (
+    echo.
+    echo Test run ended with unexpected exit code %EXITCODE%.
+    echo It did not complete. See .runtime\logs\prepare.log
+    echo.
+    pause
+    exit /b %EXITCODE%
 )
 
 echo.

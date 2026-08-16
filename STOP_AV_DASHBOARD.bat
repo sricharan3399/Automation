@@ -11,13 +11,16 @@ echo Other Python and Node processes are left alone.
 echo.
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\stop_dashboard.ps1"
+rem Numeric comparison, not `if errorlevel`: see SETUP_AND_START.bat.
+set "EXITCODE=%ERRORLEVEL%"
 
-if errorlevel 1 (
+if not "%EXITCODE%"=="0" (
     echo.
-    echo Stop reported a problem. Review .runtime\logs\stop.log
+    echo Stop reported a problem ^(exit code %EXITCODE%^).
+    echo Review .runtime\logs\stop.log
     echo.
     pause
-    exit /b 1
+    exit /b %EXITCODE%
 )
 
 exit /b 0

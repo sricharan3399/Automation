@@ -89,9 +89,11 @@ Initialize-EnvFile | Out-Null
 # ---------------------------------------------------------------------------
 Write-Stage '4/9  Python virtual environment'
 $venvPython = Get-VenvPython
+$venvCreated = $false
 if ((Test-Path $venvPython) -and -not $Force) {
     Write-Skip ".venv already exists"
 } else {
+    $venvCreated = $true
     $interpreter = $null
     foreach ($candidate in @('python', 'py')) {
         $found = Get-Command $candidate -ErrorAction SilentlyContinue
@@ -121,9 +123,26 @@ $pythonHash = Get-PythonDependencyHash
 $storedPythonHash = ''
 if ($state.hashes.ContainsKey('python')) { $storedPythonHash = $state.hashes['python'] }
 
-if (-not $Force -and $state.backend_dependencies -and $pythonHash -and $pythonHash -eq $storedPythonHash) {
-    Write-Skip 'Already current (dependency files unchanged)'
+# Corroborate the recorded flag against what is actually installed.
+#
+# Trusting state + hash alone bricked the documented repair path: deleting .venv
+# changes no dependency file, so the hash still matched and setup created an
+# EMPTY venv then skipped pip entirely - failing later at init-db and blaming the
+# database for a missing-dependency fault. Every re-run reproduced it.
+$depsImportable = $false
+if (-not $venvCreated -and (Test-Path $venvPython)) {
+    $probe = Invoke-Native -Action { & $venvPython -c "import fastapi, uvicorn, sqlalchemy, shapely, yaml, pydantic" } -Quiet
+    $depsImportable = ($probe -eq 0)
+}
+
+if (-not $Force -and -not $venvCreated -and $depsImportable -and $state.backend_dependencies -and $pythonHash -and $pythonHash -eq $storedPythonHash) {
+    Write-Skip 'Already current (dependency files unchanged, packages importable)'
 } else {
+    if ($venvCreated) {
+        Write-Host '    New virtual environment; installing dependencies' -ForegroundColor Gray
+    } elseif (-not $depsImportable) {
+        Write-Host '    Packages missing or broken; reinstalling' -ForegroundColor Gray
+    }
     Invoke-Step -Stage 'Python dependencies' -Display 'pip install --upgrade pip' `
         -Action { & $venvPython -m pip install --upgrade pip --disable-pip-version-check --quiet }
 
