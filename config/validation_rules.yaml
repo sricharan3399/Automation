@@ -1,0 +1,795 @@
+# ---------------------------------------------------------------------------
+# Validation rule catalogue.
+#
+# Every rule declares:
+#   enabled          - whether the rule runs
+#   severity         - BLOCKING | ERROR | WARNING | INFO
+#   blocks_processing- stop the per-event pipeline when the rule fails
+#   blocks_export    - the record cannot be exported to the production CSV
+#   requires_review  - route to the human review queue on failure
+#   threshold        - numeric threshold, or `null` when none applies
+#   threshold_source - config | project | none
+#   version          - rule version, recorded on every result for reproducibility
+#
+# IMPORTANT
+# Rules whose threshold_source is `project` require an APPROVED project value.
+# They ship DISABLED, and the dashboard shows them as
+# "AWAITING APPROVED PROJECT THRESHOLD". The platform never invents a
+# safety-relevant threshold.
+# ---------------------------------------------------------------------------
+
+catalogue_version: "1.0.0"
+
+rules:
+
+  # =========================================================================
+  # TEMPORAL
+  # =========================================================================
+  - id: TEMPORAL_EVAL_WINDOW_ORDER
+    category: TEMPORAL
+    description: "The evaluation window must start before it ends."
+    inputs: [evaluation_start, evaluation_end]
+    enabled: true
+    severity: BLOCKING
+    blocks_processing: true
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: TEMPORAL_EVENT_IN_WINDOW
+    category: TEMPORAL
+    description: "The approximate event time must fall inside the evaluation window."
+    inputs: [event_time, evaluation_start, evaluation_end]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: TEMPORAL_DISTANCE_MARKER_ORDER
+    category: TEMPORAL
+    description: >-
+      Approach markers must be ordered along travel direction:
+      200 m < 100 m < 60 m < junction entry < junction exit.
+    inputs: [timestamp_200m, timestamp_100m, timestamp_60m, junction_entry_time, junction_exit_time]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.1"
+
+  - id: TEMPORAL_ENTRY_BEFORE_EXIT
+    category: TEMPORAL
+    description: "Junction entry must precede junction exit."
+    inputs: [junction_entry_time, junction_exit_time]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: TEMPORAL_WAIT_LINE_BEFORE_ENTRY
+    category: TEMPORAL
+    description: "Wait-line crossing must occur at or before junction entry."
+    inputs: [wait_line_crossing_time, junction_entry_time]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: TEMPORAL_FIRST_SEEN_BEFORE_FULL_VIEW
+    category: TEMPORAL
+    description: "An object must be first visible at or before it is fully visible."
+    inputs: [first_visible_time, full_view_time]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: TEMPORAL_WITHIN_SOURCE_DURATION
+    category: TEMPORAL
+    description: "Every derived timestamp must lie inside the recorded source duration."
+    inputs: [all_timestamps, source_start, source_end]
+    enabled: true
+    severity: BLOCKING
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  # =========================================================================
+  # GEOMETRY
+  # =========================================================================
+  - id: GEOMETRY_POLYGON_MIN_POINTS
+    category: GEOMETRY
+    description: "A junction polygon needs at least 3 unique, non-collinear points."
+    inputs: [junction_polygon]
+    enabled: true
+    severity: BLOCKING
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: 3
+    threshold_source: config
+    version: "1.0"
+
+  - id: GEOMETRY_POLYGON_VALID
+    category: GEOMETRY
+    description: "The junction polygon must be a simple, non self-intersecting ring."
+    inputs: [junction_polygon]
+    enabled: true
+    severity: BLOCKING
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: GEOMETRY_POLYGON_AREA_PLAUSIBLE
+    category: GEOMETRY
+    description: "The polygon area must fall inside the configured plausible range."
+    inputs: [junction_polygon]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: GEOMETRY_TRAJECTORY_INTERSECTS_JUNCTION
+    category: GEOMETRY
+    description: "The ego trajectory must actually pass through the selected junction."
+    inputs: [ego_trajectory, junction_polygon]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: GEOMETRY_ENTRY_EDGE_ON_POLYGON
+    category: GEOMETRY
+    description: "The entry edge must be an edge of the selected junction polygon."
+    inputs: [entry_edge, junction_polygon]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: GEOMETRY_EXIT_EDGE_ON_POLYGON
+    category: GEOMETRY
+    description: "The exit edge must be an edge of the selected junction polygon."
+    inputs: [exit_edge, junction_polygon]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: GEOMETRY_EGO_CROSSES_ENTRY_EDGE
+    category: GEOMETRY
+    description: "The ego trajectory must cross the nominated entry edge."
+    inputs: [ego_trajectory, entry_edge]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: GEOMETRY_EGO_CROSSES_EXIT_EDGE
+    category: GEOMETRY
+    description: "The ego trajectory must cross the nominated exit edge."
+    inputs: [ego_trajectory, exit_edge]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: GEOMETRY_MAP_ALIGNMENT
+    category: MAP
+    description: "Lateral offset between ego trajectory and mapped lane centreline must be acceptable."
+    inputs: [ego_trajectory, lane_centerlines]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: GEOMETRY_TOPOLOGY_PLAUSIBLE
+    category: GEOMETRY
+    description: "Entry and exit edges must be distinct and consistent with the map topology."
+    inputs: [entry_edge, exit_edge, map_topology]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  # =========================================================================
+  # SYNCHRONIZATION
+  # =========================================================================
+  - id: SYNC_TIMESTAMP_MONOTONIC
+    category: SYNCHRONIZATION
+    description: "Stream timestamps must be strictly non-decreasing."
+    inputs: [streams]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: SYNC_CAMERA_OFFSET
+    category: SYNCHRONIZATION
+    description: "Camera-to-master offset must stay inside the configured budget."
+    inputs: [camera_streams, master_timeline]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: SYNC_TELEMETRY_OFFSET
+    category: SYNCHRONIZATION
+    description: "Telemetry-to-master offset must stay inside the configured budget."
+    inputs: [telemetry_streams, master_timeline]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: SYNC_TIMESTAMP_GAP
+    category: SYNCHRONIZATION
+    description: "No stream may contain a sample gap larger than the configured maximum."
+    inputs: [streams]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: SYNC_DUPLICATE_TIMESTAMPS
+    category: SYNCHRONIZATION
+    description: "Duplicate sample timestamps indicate a recording or export fault."
+    inputs: [streams]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  # =========================================================================
+  # SENSOR / DATA COMPLETENESS
+  # =========================================================================
+  - id: SENSOR_REQUIRED_STREAM_PRESENT
+    category: SENSOR
+    description: "Every stream marked Required in the sensor configuration must exist."
+    inputs: [streams, sensor_configuration]
+    enabled: true
+    severity: BLOCKING
+    blocks_processing: true
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: SENSOR_STREAM_AVAILABILITY
+    category: SENSOR
+    description: "Required streams must meet the configured minimum availability percentage."
+    inputs: [streams]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: SENSOR_FROZEN_STREAM
+    category: SENSOR
+    description: "A mandatory stream must not be frozen (identical payload signature over time)."
+    inputs: [streams]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: SENSOR_DROPPED_FRAMES
+    category: SENSOR
+    description: "Camera frame drops relative to the declared sample rate."
+    inputs: [camera_streams]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: SENSOR_DUPLICATE_FRAMES
+    category: SENSOR
+    description: "Repeated identical camera frames within a stream."
+    inputs: [camera_streams]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: DATA_MANDATORY_FIELDS
+    category: DATA_QUALITY
+    description: "All mandatory canonical metadata fields must be populated."
+    inputs: [event_metadata]
+    enabled: true
+    severity: BLOCKING
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: DATA_LOCALIZATION_QUALITY
+    category: LOCALIZATION
+    description: "Localisation/GPS quality must be sufficient for distance-based timestamping."
+    inputs: [ego_poses]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: DATA_COUNTRY_AUTHORITATIVE
+    category: METADATA
+    description: >-
+      Country must be resolved from an authoritative metadata field
+      (country_code preferred). Filename-derived country is never sufficient.
+    inputs: [country_code, country]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.1"
+
+  # =========================================================================
+  # PERCEPTION (candidate findings - reference data required)
+  # =========================================================================
+  - id: BUS_MISSED_DETECTION
+    category: PERCEPTION
+    description: "A bus present in reference data has no matching perception detection."
+    inputs: [reference_objects, perception_detections]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+    requires_reference_data: true
+
+  - id: BUS_FALSE_POSITIVE
+    category: PERCEPTION
+    description: "A perceived bus has no matching object in reference data."
+    inputs: [reference_objects, perception_detections]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+    requires_reference_data: true
+
+  - id: BUS_WRONG_CLASSIFICATION
+    category: PERCEPTION
+    description: "A reference bus is matched but classified as another object type."
+    inputs: [reference_objects, perception_detections]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+    requires_reference_data: true
+
+  - id: LOW_CONFIDENCE_BUS
+    category: PERCEPTION
+    description: "Bus detections sustained below the configured confidence floor."
+    inputs: [perception_detections]
+    enabled: true
+    severity: INFO
+    blocks_processing: false
+    blocks_export: false
+    requires_review: false
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: BUS_BOUNDING_BOX_MISMATCH
+    category: PERCEPTION
+    description: "Matched bus detection IoU against reference falls below the threshold."
+    inputs: [reference_objects, perception_detections]
+    enabled: false
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: project
+    version: "1.0"
+    requires_reference_data: true
+
+  - id: BUS_DISTANCE_ESTIMATION_ERROR
+    category: PERCEPTION
+    description: "Longitudinal distance error against reference exceeds the approved tolerance."
+    inputs: [reference_objects, perception_detections]
+    enabled: false
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: project
+    version: "1.0"
+    requires_reference_data: true
+
+  - id: BUS_VELOCITY_ESTIMATION_ERROR
+    category: PERCEPTION
+    description: "Velocity error against reference exceeds the approved tolerance."
+    inputs: [reference_objects, perception_detections]
+    enabled: false
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: project
+    version: "1.0"
+    requires_reference_data: true
+
+  # =========================================================================
+  # TRACKING
+  # =========================================================================
+  - id: BUS_TRACK_ID_SWITCH
+    category: TRACKING
+    description: "A continuously tracked bus receives an unexpected identity change."
+    inputs: [bus_tracks]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.4"
+
+  - id: BUS_TRACK_LOSS
+    category: TRACKING
+    description: "A bus track ends while the object is still expected to be observable."
+    inputs: [bus_tracks]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: BUS_TRACK_FRAGMENTATION
+    category: TRACKING
+    description: "A single bus is represented by multiple short, non-overlapping tracks."
+    inputs: [bus_tracks]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: BUS_DUPLICATE_TRACK
+    category: TRACKING
+    description: "Two concurrent tracks describe the same physical bus."
+    inputs: [bus_tracks]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: BUS_TEMPORARY_LOSS
+    category: TRACKING
+    description: "A bus track gaps and resumes with the same identity."
+    inputs: [bus_tracks]
+    enabled: true
+    severity: INFO
+    blocks_processing: false
+    blocks_export: false
+    requires_review: false
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  # =========================================================================
+  # BEHAVIOR - observations only, never automatic failure classification
+  # =========================================================================
+  - id: BEHAVIOR_STOP_OBSERVATION
+    category: BEHAVIOR
+    description: >-
+      Records the observed stop behaviour (speed below threshold and for how
+      long). This is an OBSERVATION, not a pass/fail judgement.
+    inputs: [ego_speed]
+    enabled: true
+    severity: INFO
+    blocks_processing: false
+    blocks_export: false
+    requires_review: false
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  - id: BEHAVIOR_ROLLING_STOP_CANDIDATE
+    category: BEHAVIOR
+    description: >-
+      Ego slowed below the stop threshold but not for the configured full-stop
+      duration. Flagged as a CANDIDATE for human interpretation only.
+    inputs: [ego_speed, wait_line_crossing_time]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: config
+    version: "1.0"
+
+  # =========================================================================
+  # TRAFFIC CONTROL
+  # =========================================================================
+  - id: TRAFFIC_CONTROL_PRESENT
+    category: TRAFFIC_CONTROL
+    description: "A signalised junction must have at least one traffic-control entity in context."
+    inputs: [traffic_controls, intersection_type]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: TRAFFIC_LIGHT_STATE_CONSISTENCY
+    category: TRAFFIC_CONTROL
+    description: "Observed signal state transitions must follow a region-legal sequence."
+    inputs: [traffic_light_observations, region_signal_model]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  # =========================================================================
+  # MAP
+  # =========================================================================
+  - id: MAP_CONTEXT_AVAILABLE
+    category: MAP
+    description: "Map context must be retrievable for the trajectory area."
+    inputs: [map_context]
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: MAP_VERSION_RECORDED
+    category: MAP
+    description: "The map version used must be recorded for reproducibility."
+    inputs: [map_context]
+    enabled: true
+    severity: WARNING
+    blocks_processing: false
+    blocks_export: false
+    requires_review: false
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  # =========================================================================
+  # DUPLICATE
+  # =========================================================================
+  - id: DUPLICATE_CANONICAL_KEY
+    category: DUPLICATE
+    description: >-
+      A record with the same canonical_event_key already exists. The existing
+      record is UPSERTED (reviewer comments preserved), never duplicated.
+    inputs: [canonical_event_key]
+    enabled: true
+    severity: INFO
+    blocks_processing: false
+    blocks_export: false
+    requires_review: false
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  # =========================================================================
+  # CSV EXPORT
+  # =========================================================================
+  - id: CSV_MANDATORY_VALUES
+    category: CSV
+    description: "All mandatory template columns must be populated."
+    enabled: true
+    severity: BLOCKING
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: CSV_ENUM_VALIDITY
+    category: CSV
+    description: "Enumerated columns must contain values from the approved taxonomy."
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: CSV_TIMESTAMP_ORDERING
+    category: CSV
+    description: "Timestamp columns in the exported row must remain correctly ordered."
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: CSV_DUPLICATE_KEYS
+    category: CSV
+    description: "canonical_event_key must be unique within the exported file."
+    enabled: true
+    severity: BLOCKING
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: CSV_CONFIDENCE_RANGE
+    category: CSV
+    description: "Confidence columns must lie within 0.0 - 1.0."
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: false
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: CSV_COUNTRY_CONSISTENCY
+    category: CSV
+    description: "country and country_code must agree, and match the run filter."
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: true
+    threshold: null
+    threshold_source: none
+    version: "1.0"
+
+  - id: CSV_ENCODING_AND_ESCAPING
+    category: CSV
+    description: >-
+      Cell values must be encodable in the configured encoding and must not
+      contain unescaped delimiters, quotes, newlines or CSV-injection prefixes.
+    enabled: true
+    severity: ERROR
+    blocks_processing: false
+    blocks_export: true
+    requires_review: false
+    threshold: null
+    threshold_source: none
+    version: "1.1"

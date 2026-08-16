@@ -1,0 +1,133 @@
+# ---------------------------------------------------------------------------
+# SECURITY: this repository must never contain AV production data or secrets.
+#
+# Run `python scripts/repository_audit.py` before committing. It consults these
+# rules via `git check-ignore`, so anything listed here is proven ignored rather
+# than assumed to be.
+#
+# See docs/SECURITY.md before adding any exception.
+# ---------------------------------------------------------------------------
+
+# --- Secrets and credentials ----------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.ppk
+*.crt
+credentials.*
+secrets.*
+.npmrc
+.pypirc
+.netrc
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+config/connections.local.json
+
+# --- Local runtime state (never shared between laptops) --------------------
+# `dir/*` plus a .gitkeep negation: git cannot re-include a file inside a fully
+# ignored directory, so the directory itself must not be ignored outright.
+.runtime/
+data/*
+!data/.gitkeep
+output/*
+!output/.gitkeep
+exports/
+evidence/
+checkpoints/
+recordings/
+datasets/
+logs/
+cache/
+tmp/
+temp/
+
+# --- Runtime databases -----------------------------------------------------
+# A second laptop initialises its own database from the models and seed code.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# --- Raw AV data -----------------------------------------------------------
+# Recordings, sensor dumps and point clouds never belong in git.
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.h264
+*.bag
+*.db3
+*.mcap
+*.pcap
+*.pcapng
+*.las
+*.laz
+*.ply
+*.pcd
+*.raw
+*.npy
+*.npz
+*.parquet
+*.feather
+raw_sensor/
+camera_frames/
+lidar/
+radar/
+gps/
+telemetry/
+hdmaps/
+
+# --- Python ----------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+*.spec
+
+# --- Node / frontend -------------------------------------------------------
+node_modules/
+dashboard/node_modules/
+frontend/node_modules/
+dashboard/dist/
+dashboard/.vite/
+.vite/
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# --- Logs ------------------------------------------------------------------
+*.log
+
+# --- Editors ---------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- Operating system ------------------------------------------------------
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+.DS_Store

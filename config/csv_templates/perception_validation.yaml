@@ -1,0 +1,27 @@
+id: perception_validation
+name: "Perception Validation"
+description: "Perception and tracking candidate findings for the selected object class."
+version: "1.0.0"
+
+columns:
+  - { key: canonical_event_key,  header: canonical_event_key,  type: string,   required: true }
+  - { key: anonymized_event_ref, header: anonymized_event_ref, type: string,   required: true }
+  - { key: country_code,         header: country_code,         type: string,   required: true }
+  - { key: object_type,          header: object_type,          type: list,     required: true, enum: object_type }
+  - { key: bus_type,             header: bus_type,             type: string,   required: false, enum: bus_subtype }
+  - { key: lane_relation,        header: lane_relation,        type: string,   required: false, enum: ego_lane_relation }
+  - { key: first_visible_time,   header: first_visible_time,   type: datetime, required: false }
+  - { key: full_view_time,       header: full_view_time,       type: datetime, required: false }
+  - { key: bus_detection_confidence, header: bus_detection_confidence, type: confidence, required: false }
+  - { key: perception_findings,  header: perception_findings,  type: list,     required: false }
+  - { key: tracking_findings,    header: tracking_findings,    type: list,     required: false }
+  - { key: track_count,          header: track_count,          type: int,      required: false }
+  - { key: reference_data_available, header: reference_data_available, type: bool, required: true }
+  - { key: abnormality_categories, header: abnormality_categories, type: list, required: false, enum: abnormality_category }
+  - { key: automation_recommendation, header: automation_recommendation, type: string, required: false }
+  - { key: reviewer_decision,    header: reviewer_decision,    type: string,   required: false }
+  - { key: final_status,         header: final_status,         type: string,   required: true, enum: record_status }
+  - { key: submission_blocking_error_count, header: submission_blocking_error_count, type: int, required: true }
+  - { key: model_version,        header: model_version,        type: string,   required: false }
+  - { key: rule_version,         header: rule_version,         type: string,   required: true }
+  - { key: last_updated_at,      header: last_updated_at,      type: datetime, required: true }

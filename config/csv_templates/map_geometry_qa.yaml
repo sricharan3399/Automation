@@ -1,0 +1,31 @@
+id: map_geometry_qa
+name: "Map / Geometry QA"
+description: "Junction selection, polygon, entry/exit edges and map alignment quality."
+version: "1.0.0"
+
+columns:
+  - { key: canonical_event_key,  header: canonical_event_key,  type: string,   required: true }
+  - { key: anonymized_event_ref, header: anonymized_event_ref, type: string,   required: true }
+  - { key: country_code,         header: country_code,         type: string,   required: true }
+  - { key: map_version,          header: map_version,          type: string,   required: false }
+  - { key: target_junction,      header: target_junction,      type: string,   required: false }
+  - { key: junction_confidence,  header: junction_confidence,  type: confidence, required: false }
+  - { key: intersection_type,    header: intersection_type,    type: string,   required: false, enum: intersection_type }
+  - { key: intersection_complexity, header: intersection_complexity, type: string, required: false, enum: intersection_complexity }
+  - { key: polygon_point_count,  header: polygon_point_count,  type: int,      required: false }
+  - { key: polygon_area_m2,      header: polygon_area_m2,      type: float,    required: false }
+  - { key: polygon_confidence,   header: polygon_confidence,   type: confidence, required: false }
+  - { key: geometry_validation_result, header: geometry_validation_result, type: string, required: false }
+  - { key: entry_edge,           header: entry_edge,           type: string,   required: false }
+  - { key: entry_edge_confidence, header: entry_edge_confidence, type: confidence, required: false }
+  - { key: exit_edge,            header: exit_edge,            type: string,   required: false }
+  - { key: exit_edge_confidence, header: exit_edge_confidence, type: confidence, required: false }
+  - { key: map_alignment_result, header: map_alignment_result, type: string,   required: false }
+  - { key: map_alignment_confidence, header: map_alignment_confidence, type: confidence, required: false }
+  - { key: max_lateral_offset_m, header: max_lateral_offset_m, type: float,    required: false }
+  - { key: abnormality_categories, header: abnormality_categories, type: list, required: false, enum: abnormality_category }
+  - { key: reviewer_decision,    header: reviewer_decision,    type: string,   required: false }
+  - { key: final_status,         header: final_status,         type: string,   required: true, enum: record_status }
+  - { key: submission_blocking_error_count, header: submission_blocking_error_count, type: int, required: true }
+  - { key: rule_version,         header: rule_version,         type: string,   required: true }
+  - { key: last_updated_at,      header: last_updated_at,      type: datetime, required: true }

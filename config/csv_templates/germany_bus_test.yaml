@@ -1,0 +1,104 @@
+# ---------------------------------------------------------------------------
+# CSV template: Germany Bus Test (default)
+#
+# `key`      - key in the flat export record produced by reports/csv_builder.py
+# `header`   - column header written to the file
+# `type`     - string | int | float | datetime | duration | list | bool | confidence
+# `required` - blank value raises CSV_MANDATORY_VALUES (BLOCKING)
+# `enum`     - taxonomy key validated by CSV_ENUM_VALIDITY
+# ---------------------------------------------------------------------------
+
+id: germany_bus_test
+name: "Germany Bus Test"
+description: "Default schema for German bus-scenario validation runs."
+version: "1.0.0"
+
+columns:
+  # --- identity / provenance --------------------------------------------
+  - { key: canonical_event_key,   header: canonical_event_key,   type: string,   required: true }
+  - { key: anonymized_job_ref,    header: anonymized_job_ref,    type: string,   required: false }
+  - { key: anonymized_event_ref,  header: anonymized_event_ref,  type: string,   required: true }
+  - { key: record_version,        header: record_version,        type: int,      required: true }
+  - { key: review_date,           header: review_date,           type: datetime, required: false }
+
+  # --- geography ---------------------------------------------------------
+  - { key: country,               header: country,               type: string,   required: true }
+  - { key: country_code,          header: country_code,          type: string,   required: true }
+  - { key: region,                header: region,                type: string,   required: false }
+  - { key: city,                  header: city,                  type: string,   required: false }
+
+  # --- scenario ----------------------------------------------------------
+  - { key: scenario_type,         header: scenario_type,         type: string,   required: false }
+  - { key: object_type,           header: object_type,           type: list,     required: true,  enum: object_type }
+  - { key: bus_type,              header: bus_type,              type: string,   required: false, enum: bus_subtype }
+
+  # --- road / lanes ------------------------------------------------------
+  - { key: road_type,             header: road_type,             type: string,   required: false, enum: road_type }
+  - { key: lane_count,            header: lane_count,            type: int,      required: false }
+  - { key: lane_relation,         header: lane_relation,         type: string,   required: false, enum: ego_lane_relation }
+
+  # --- intersection ------------------------------------------------------
+  - { key: intersection_type,       header: intersection_type,       type: string, required: false, enum: intersection_type }
+  - { key: intersection_complexity, header: intersection_complexity, type: string, required: false, enum: intersection_complexity }
+
+  # --- traffic control ---------------------------------------------------
+  - { key: traffic_control_entity,          header: traffic_control_entity,          type: list,       required: false, enum: traffic_control_entity }
+  - { key: traffic_light_state,             header: traffic_light_state,             type: string,     required: false, enum: traffic_light_state }
+  - { key: traffic_light_state_confidence,  header: traffic_light_state_confidence,  type: confidence, required: false }
+  - { key: signal_relevance_confidence,     header: signal_relevance_confidence,     type: confidence, required: false }
+
+  # --- behaviour (observations) ------------------------------------------
+  - { key: vehicle_maneuver,      header: vehicle_maneuver,      type: string,   required: false, enum: vehicle_maneuver }
+  - { key: approach_detected,     header: approach_detected,     type: bool,     required: false }
+  - { key: deceleration_detected, header: deceleration_detected, type: bool,     required: false }
+  - { key: stop_classification,   header: stop_classification,   type: string,   required: false, enum: stop_classification }
+  - { key: minimum_speed,         header: minimum_speed,         type: float,    required: false }
+  - { key: stop_duration,         header: stop_duration,         type: duration, required: false }
+  - { key: wait_line_distance,    header: wait_line_distance,    type: float,    required: false }
+
+  # --- object visibility timestamps --------------------------------------
+  - { key: first_visible_time,    header: first_visible_time,    type: datetime, required: false }
+  - { key: full_view_time,        header: full_view_time,        type: datetime, required: false }
+
+  # --- approach / junction timestamps ------------------------------------
+  - { key: timestamp_200m,          header: timestamp_200m,          type: datetime, required: false }
+  - { key: timestamp_100m,          header: timestamp_100m,          type: datetime, required: false }
+  - { key: timestamp_60m,           header: timestamp_60m,           type: datetime, required: false }
+  - { key: wait_line_crossing_time, header: wait_line_crossing_time, type: datetime, required: false }
+  - { key: junction_entry_time,     header: junction_entry_time,     type: datetime, required: false }
+  - { key: junction_exit_time,      header: junction_exit_time,      type: datetime, required: false }
+  - { key: post_junction_20m_time,  header: post_junction_20m_time,  type: datetime, required: false }
+
+  # --- geometry ----------------------------------------------------------
+  - { key: polygon_point_count,      header: polygon_point_count,      type: int,        required: false }
+  - { key: polygon_confidence,       header: polygon_confidence,       type: confidence, required: false }
+  - { key: geometry_validation_result, header: geometry_validation_result, type: string, required: false }
+  - { key: entry_edge,               header: entry_edge,               type: string,     required: false }
+  - { key: entry_edge_confidence,    header: entry_edge_confidence,    type: confidence, required: false }
+  - { key: exit_edge,                header: exit_edge,                type: string,     required: false }
+  - { key: exit_edge_confidence,     header: exit_edge_confidence,     type: confidence, required: false }
+  - { key: map_alignment_result,     header: map_alignment_result,     type: string,     required: false }
+  - { key: synchronization_quality,  header: synchronization_quality,  type: string,     required: false }
+
+  # --- findings ----------------------------------------------------------
+  - { key: missing_sensor_warnings,  header: missing_sensor_warnings,  type: list,       required: false }
+  - { key: data_quality_warnings,    header: data_quality_warnings,    type: list,       required: false }
+  - { key: abnormality_categories,   header: abnormality_categories,   type: list,       required: false, enum: abnormality_category }
+  - { key: automation_overall_confidence, header: automation_overall_confidence, type: confidence, required: false }
+  - { key: automation_recommendation,     header: automation_recommendation,     type: string,     required: false }
+
+  # --- human review ------------------------------------------------------
+  - { key: reviewer_decision,        header: reviewer_decision,        type: string, required: false }
+  - { key: reviewer_override_count,  header: reviewer_override_count,  type: int,    required: false }
+  - { key: reviewer_comments,        header: reviewer_comments,        type: string, required: false }
+
+  # --- evidence ----------------------------------------------------------
+  - { key: evidence_folder,          header: evidence_folder,          type: string, required: false }
+  - { key: evidence_manifest,        header: evidence_manifest,        type: string, required: false }
+
+  # --- status / versions -------------------------------------------------
+  - { key: final_status,                   header: final_status,                   type: string, required: true, enum: record_status }
+  - { key: submission_blocking_error_count, header: submission_blocking_error_count, type: int,   required: true }
+  - { key: model_version,            header: model_version,            type: string,   required: false }
+  - { key: rule_version,             header: rule_version,             type: string,   required: true }
+  - { key: last_updated_at,          header: last_updated_at,          type: datetime, required: true }

@@ -1,0 +1,215 @@
+# ---------------------------------------------------------------------------
+# Source field -> canonical field mapping.
+#
+# The dashboard "Discover Schema" action inspects the connected source and
+# proposes a mapping. Confirmed mappings are saved into the database as part of
+# a connection profile; this file only supplies the DEFAULT candidates used to
+# auto-suggest a mapping for an unseen source.
+#
+# `aliases` are matched case-insensitively against the discovered source field
+# names (exact match first, then normalised match ignoring _ - and spaces).
+# ---------------------------------------------------------------------------
+
+version: "1.0.0"
+
+canonical_fields:
+
+  # --- identity ----------------------------------------------------------
+  event_id:
+    type: string
+    required: true
+    aliases: [event, event_id, eventId, event_uuid, id, clip_id, snippet_id]
+  session_id:
+    type: string
+    required: true
+    aliases: [session, session_id, sessionId, drive_id, log_id, recording_id]
+  job_ref:
+    type: string
+    required: false
+    aliases: [job, job_id, jobId, task_id, batch_id]
+
+  # --- geography ---------------------------------------------------------
+  country:
+    type: string
+    required: true
+    aliases: [country, country_name, countryName, nation]
+  country_code:
+    type: string
+    required: true
+    # Authoritative field. Country selection resolves against this first.
+    aliases: [country_code, countryCode, iso_country, iso3166_1, cc]
+  region:
+    type: string
+    required: false
+    aliases: [region, state, province, bundesland, admin_area]
+  city:
+    type: string
+    required: false
+    aliases: [city, town, municipality, locality]
+  test_area:
+    type: string
+    required: false
+    aliases: [test_area, testArea, area, site, zone]
+  route:
+    type: string
+    required: false
+    aliases: [route, route_name, routeId, route_id]
+
+  # --- timing ------------------------------------------------------------
+  event_time:
+    type: datetime
+    required: true
+    aliases: [event_time, eventTime, timestamp, ts, event_timestamp, utc_time]
+  evaluation_start:
+    type: datetime
+    required: false
+    aliases: [evaluation_start, eval_start, window_start, start_time, clip_start]
+  evaluation_end:
+    type: datetime
+    required: false
+    aliases: [evaluation_end, eval_end, window_end, end_time, clip_end]
+  duration_s:
+    type: float
+    required: false
+    aliases: [duration, duration_s, duration_seconds, length_s]
+
+  # --- scene -------------------------------------------------------------
+  road_type:
+    type: string
+    required: false
+    aliases: [road_type, roadType, road_class, roadClass, functional_class, highway_type]
+  lane_count:
+    type: int
+    required: false
+    aliases: [lane_count, laneCount, num_lanes, lanes, number_of_lanes]
+  lane_id:
+    type: string
+    required: false
+    aliases: [lane_id, laneId, ego_lane_id, current_lane]
+  lane_configuration:
+    type: list
+    required: false
+    aliases: [lane_configuration, lane_config, lane_types, lane_tags]
+  intersection_type:
+    type: string
+    required: false
+    aliases: [intersection_type, junction_type, intersectionType, node_type]
+  intersection_complexity:
+    type: string
+    required: false
+    aliases: [intersection_complexity, junction_complexity, complexity]
+  traffic_control_entity:
+    type: list
+    required: false
+    aliases: [traffic_control, traffic_control_entity, control_type, tc_entity]
+  traffic_light_state:
+    type: string
+    required: false
+    aliases: [traffic_light_state, signal_state, tl_state, light_state]
+  weather:
+    type: string
+    required: false
+    aliases: [weather, weather_condition, weatherCondition, precipitation]
+  lighting:
+    type: string
+    required: false
+    aliases: [lighting, lighting_condition, illumination, time_of_day, daylight]
+
+  # --- objects / scenario -------------------------------------------------
+  object_type:
+    type: list
+    required: false
+    aliases: [object_type, objectType, class, object_class, category, label]
+  bus_type:
+    type: string
+    required: false
+    aliases: [bus_type, busType, bus_subclass, vehicle_subtype]
+  scenario_tags:
+    type: list
+    required: false
+    aliases: [scenario_tags, scenarios, tags, scenario, event_tags]
+  vehicle_maneuver:
+    type: string
+    required: false
+    aliases: [vehicle_maneuver, maneuver, ego_maneuver, driving_maneuver]
+
+  # --- dataset provenance -------------------------------------------------
+  project:
+    type: string
+    required: false
+    aliases: [project, project_name, projectId, project_id]
+  dataset:
+    type: string
+    required: false
+    aliases: [dataset, dataset_name, collection, datasetId]
+  dataset_version:
+    type: string
+    required: false
+    aliases: [dataset_version, datasetVersion, version, revision]
+  drive_collection:
+    type: string
+    required: false
+    aliases: [drive_collection, collection_name, campaign]
+  vehicle_build:
+    type: string
+    required: false
+    aliases: [vehicle_build, vehicleBuild, car_build, platform_build]
+  software_version:
+    type: string
+    required: false
+    aliases: [software_version, softwareVersion, sw_version, stack_version, release]
+  map_version:
+    type: string
+    required: false
+    aliases: [map_version, mapVersion, hd_map_version, map_release]
+
+# Canonical values that the platform understands, and the source spellings that
+# normalise onto them. Unknown source values are preserved verbatim and surfaced
+# in the UI as "unmapped" rather than being silently discarded.
+value_maps:
+  road_type:
+    urban: [urban, city, innerstadt, innerorts, built_up]
+    residential: [residential, living_street, wohngebiet]
+    rural: [rural, country, landstrasse, ausserorts]
+    highway: [highway, trunk, schnellstrasse]
+    motorway: [motorway, freeway]
+    autobahn: [autobahn, bab]
+    ramp: [ramp, slip_road, on_ramp, off_ramp, auffahrt, abfahrt]
+    service_road: [service, service_road, frontage]
+    roundabout: [roundabout, rotary, kreisverkehr]
+    bus_lane: [bus_lane, busspur, bus_only]
+    construction_area: [construction, roadworks, baustelle, work_zone]
+    parking_area: [parking, parking_lot, parkplatz]
+  weather:
+    clear: [clear, sunny, fine]
+    cloudy: [cloudy, overcast, partly_cloudy]
+    rain: [rain, rainy, light_rain, drizzle]
+    heavy_rain: [heavy_rain, downpour, storm]
+    snow: [snow, snowy, sleet]
+    fog: [fog, foggy, mist, haze]
+    wet_road: [wet, wet_road, damp]
+  lighting:
+    day: [day, daylight, daytime, bright]
+    night: [night, nighttime, dark]
+    dawn: [dawn, sunrise, morning_twilight]
+    dusk: [dusk, sunset, evening_twilight]
+    tunnel: [tunnel, underpass]
+    backlight: [backlight, backlit, into_sun]
+    glare: [glare, sun_glare, low_sun]
+  object_type:
+    bus: [bus, omnibus, transit_bus, coach_bus]
+    truck: [truck, lorry, hgv, lkw]
+    car: [car, passenger_car, sedan, pkw]
+    van: [van, minivan, transporter]
+    motorcycle: [motorcycle, motorbike, moped, scooter]
+    bicycle: [bicycle, bike, cyclist]
+    pedestrian: [pedestrian, person, human, walker]
+    emergency_vehicle: [emergency, ambulance, police, fire_truck]
+    tram: [tram, streetcar, strassenbahn]
+  intersection_type:
+    three_way_t_junction: [t_junction, three_way, t-junction, "3_way"]
+    four_way_junction: [four_way, crossroads, "4_way", cross]
+    multi_leg_junction: [multi_leg, complex_junction, five_way]
+    roundabout: [roundabout, rotary, kreisverkehr]
+    highway_ramp: [ramp, highway_ramp, interchange]
+    railroad_crossing: [railroad_crossing, level_crossing, bahnuebergang]

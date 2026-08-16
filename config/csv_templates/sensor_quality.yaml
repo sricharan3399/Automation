@@ -1,0 +1,27 @@
+id: sensor_quality
+name: "Sensor Quality"
+description: "Stream availability, synchronisation and data-integrity findings."
+version: "1.0.0"
+
+columns:
+  - { key: canonical_event_key,  header: canonical_event_key,  type: string,   required: true }
+  - { key: anonymized_event_ref, header: anonymized_event_ref, type: string,   required: true }
+  - { key: country_code,         header: country_code,         type: string,   required: true }
+  - { key: event_time,           header: event_time,           type: datetime, required: true }
+  - { key: required_streams,     header: required_streams,     type: list,     required: false }
+  - { key: missing_sensor_warnings, header: missing_sensor_warnings, type: list, required: false }
+  - { key: stream_availability_min_pct, header: stream_availability_min_pct, type: float, required: false }
+  - { key: max_sync_offset_ms,   header: max_sync_offset_ms,   type: float,    required: false }
+  - { key: max_timestamp_gap_ms, header: max_timestamp_gap_ms, type: float,    required: false }
+  - { key: frozen_streams,       header: frozen_streams,       type: list,     required: false }
+  - { key: dropped_frame_streams, header: dropped_frame_streams, type: list,   required: false }
+  - { key: duplicate_frame_streams, header: duplicate_frame_streams, type: list, required: false }
+  - { key: synchronization_quality, header: synchronization_quality, type: string, required: false }
+  - { key: synchronization_confidence, header: synchronization_confidence, type: confidence, required: false }
+  - { key: data_quality_warnings, header: data_quality_warnings, type: list,   required: false }
+  - { key: abnormality_categories, header: abnormality_categories, type: list, required: false, enum: abnormality_category }
+  - { key: reviewer_decision,    header: reviewer_decision,    type: string,   required: false }
+  - { key: final_status,         header: final_status,         type: string,   required: true, enum: record_status }
+  - { key: submission_blocking_error_count, header: submission_blocking_error_count, type: int, required: true }
+  - { key: rule_version,         header: rule_version,         type: string,   required: true }
+  - { key: last_updated_at,      header: last_updated_at,      type: datetime, required: true }

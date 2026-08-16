@@ -1,0 +1,17 @@
+# AV Test Automation Platform - runtime dependencies
+# Python 3.10+ supported, 3.11+ recommended.
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+SQLAlchemy>=2.0.30
+pandas>=2.0.0
+numpy>=1.24.0
+PyYAML>=6.0.1
+httpx>=0.27.0
+tenacity>=8.3.0
+shapely>=2.0.4
+python-dateutil>=2.9.0
+psutil>=5.9.8
+python-multipart>=0.0.9

@@ -1,0 +1,291 @@
+# ---------------------------------------------------------------------------
+# Fallback taxonomy.
+#
+# IMPORTANT: this file is a FALLBACK ONLY.
+#
+# When a data source is connected, the platform calls
+# `adapter.get_supported_filters()` and the dashboard dropdowns are populated
+# from the SOURCE taxonomy. These values are only used when the source cannot
+# describe its own vocabulary, and every entry is returned to the UI with
+# `origin: "fallback"` so the tester can see that it was not source-derived.
+# ---------------------------------------------------------------------------
+
+object_type:
+  - bus
+  - truck
+  - car
+  - van
+  - motorcycle
+  - bicycle
+  - pedestrian
+  - emergency_vehicle
+  - construction_vehicle
+  - tram
+  - train
+  - traffic_light
+  - traffic_sign
+  - animal
+  - unknown
+
+bus_subtype:
+  - city_bus
+  - public_bus
+  - articulated_bus
+  - coach
+  - shuttle
+  - school_bus
+  - other_bus
+  - unknown_bus
+
+road_type:
+  - urban
+  - residential
+  - rural
+  - highway
+  - motorway
+  - autobahn
+  - ramp
+  - service_road
+  - construction_area
+  - roundabout
+  - parking_area
+  - bus_lane
+  - cycle_lane_adjacent
+  - unknown
+
+lane_configuration:
+  - ego_lane
+  - left_adjacent_lane
+  - right_adjacent_lane
+  - dedicated_bus_lane
+  - turn_lane
+  - merge_lane
+  - exit_lane
+  - acceleration_lane
+  - deceleration_lane
+  - opposing_lane
+  - cycle_lane
+  - parking_lane
+  - shoulder
+  - temporary_lane
+  - construction_lane
+  - unknown
+
+ego_lane_relation:
+  - object_in_ego_lane
+  - object_ahead
+  - object_behind
+  - object_left_adjacent
+  - object_right_adjacent
+  - object_crossing_ego_path
+  - object_entering_ego_lane
+  - object_leaving_ego_lane
+  - object_opposing_direction
+  - object_stationary
+  - object_moving
+  - object_at_bus_stop
+
+intersection_type:
+  - no_intersection
+  - three_way_t_junction
+  - four_way_junction
+  - multi_leg_junction
+  - roundabout
+  - highway_ramp
+  - merge
+  - diverge
+  - driveway_junction
+  - railroad_crossing
+  - construction_junction
+  - unknown
+
+intersection_complexity:
+  - any
+  - simple
+  - moderate
+  - complex
+  - very_complex
+  - unknown
+
+traffic_control_entity:
+  - traffic_light
+  - stop_sign
+  - yield_sign
+  - pedestrian_crossing
+  - railroad_control
+  - temporary_signal
+  - construction_control
+  - uncontrolled
+  - unknown
+
+traffic_light_state:
+  - red
+  - yellow
+  - green
+  - red_yellow
+  - flashing_red
+  - flashing_yellow
+  - flashing_green
+  - off
+  - occluded
+  - unknown
+
+vehicle_maneuver:
+  - straight
+  - left_turn
+  - right_turn
+  - u_turn
+  - lane_change_left
+  - lane_change_right
+  - merge
+  - diverge
+  - stop
+  - rolling_stop
+  - proceed
+  - yield
+  - wait
+  - overtake
+  - unknown
+
+weather:
+  - clear
+  - cloudy
+  - rain
+  - heavy_rain
+  - snow
+  - fog
+  - wet_road
+  - unknown
+
+lighting:
+  - day
+  - night
+  - dawn
+  - dusk
+  - tunnel
+  - backlight
+  - glare
+  - low_light
+  - unknown
+
+bus_scenario_tag:
+  - BUS_AHEAD_SAME_LANE
+  - BUS_ADJACENT_LANE
+  - BUS_AT_STOP
+  - BUS_APPROACHING_STOP
+  - BUS_LEAVING_STOP
+  - BUS_MERGING
+  - BUS_CUT_IN
+  - BUS_CUT_OUT
+  - BUS_LANE_CHANGE
+  - BUS_TURNING_LEFT
+  - BUS_TURNING_RIGHT
+  - BUS_CROSSING_EGO_PATH
+  - BUS_OCCLUDED
+  - BUS_PARTIALLY_VISIBLE
+  - BUS_CLOSE_DISTANCE
+  - BUS_HIGH_RELATIVE_SPEED
+  - BUS_INTERSECTION
+  - BUS_SIGNAL_INTERACTION
+  - BUS_PEDESTRIAN_INTERACTION
+  - BUS_CYCLIST_INTERACTION
+  - BUS_CONSTRUCTION_ZONE
+  - MULTIPLE_BUSES
+  - ARTICULATED_BUS
+
+camera_position:
+  - front_narrow
+  - front_wide
+  - front_main
+  - left
+  - right
+  - rear
+  - fisheye
+  - other
+
+stream_type:
+  - camera
+  - lidar
+  - radar
+  - gps
+  - imu
+  - can
+  - vehicle_state
+  - localization
+  - perception
+  - prediction
+  - planning
+  - map
+  - trajectory
+
+# Abnormality categories written to the CSV. The first block is the controlled
+# vocabulary from the platform specification; BEHAVIOR and CSV are documented
+# platform extensions (behaviour candidates and export-validation findings are
+# first-class outputs here and need somewhere truthful to live).
+abnormality_category:
+  - PERCEPTION
+  - TRACKING
+  - SENSOR
+  - SYNCHRONIZATION
+  - LOCALIZATION
+  - MAP
+  - GEOMETRY
+  - TIMESTAMP
+  - PLANNING
+  - PREDICTION
+  - TRAFFIC_CONTROL
+  - DATA_QUALITY
+  - ANNOTATION
+  - METADATA
+  - DUPLICATE
+  - OTHER
+  - BEHAVIOR
+  - CSV
+
+# Rule-catalogue categories shown on the Validation Rules page. These group
+# rules for the tester; they are NOT the same vocabulary as
+# `abnormality_category`, which is what the CSV records.
+rule_category:
+  - TEMPORAL
+  - GEOMETRY
+  - SYNCHRONIZATION
+  - SENSOR
+  - DATA_QUALITY
+  - LOCALIZATION
+  - METADATA
+  - PERCEPTION
+  - TRACKING
+  - BEHAVIOR
+  - MAP
+  - TRAFFIC_CONTROL
+  - DUPLICATE
+  - CSV
+
+severity:
+  - BLOCKING
+  - ERROR
+  - WARNING
+  - INFO
+
+project_severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+  - LOW
+
+record_status:
+  - CANDIDATE
+  - AUTO_PREPARED
+  - REVIEW_REQUIRED
+  - CONFIRMED_BY_TESTER
+  - REJECTED_BY_TESTER
+  - BLOCKED_DATA_ERROR
+  - SENIOR_REVIEW_REQUIRED
+
+stop_classification:
+  - not_applicable
+  - no_stop_detected
+  - rolling_stop_candidate
+  - full_stop_detected
+  - stationary_throughout
+  - unknown

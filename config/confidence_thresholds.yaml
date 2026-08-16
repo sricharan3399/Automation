@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# Field-level confidence routing policy.
+#
+# The platform maintains SEPARATE confidence per field. There is no single
+# global confidence that decides a record's fate.
+#
+# Routing bands (all values inclusive of lower bound, exclusive of upper):
+#   auto_confirm    -> prefill; quick reviewer confirmation
+#   verify          -> prefill; MANDATORY reviewer verification
+#   suggest         -> show ranked recommendations; DO NOT auto-select
+#   manual          -> leave blank; manual selection required
+# ---------------------------------------------------------------------------
+
+version: "1.0.0"
+
+bands:
+  auto_confirm:
+    min: 0.95
+    max: 1.01
+    action: prefill
+    reviewer: quick_confirmation
+    auto_select: true
+  verify:
+    min: 0.80
+    max: 0.95
+    action: prefill
+    reviewer: mandatory_verification
+    auto_select: true
+  suggest:
+    min: 0.50
+    max: 0.80
+    action: rank_recommendations
+    reviewer: mandatory_selection
+    auto_select: false
+  manual:
+    min: 0.0
+    max: 0.50
+    action: leave_blank
+    reviewer: manual_entry
+    auto_select: false
+
+# Fields tracked independently. `safety_critical: true` forces senior review on
+# reviewer/automation disagreement regardless of the confidence band.
+fields:
+  junction_confidence:            { safety_critical: false, weight: 1.0 }
+  polygon_confidence:             { safety_critical: false, weight: 1.0 }
+  entry_edge_confidence:          { safety_critical: false, weight: 1.0 }
+  exit_edge_confidence:           { safety_critical: false, weight: 1.0 }
+  first_seen_confidence:          { safety_critical: false, weight: 1.0 }
+  timestamp_confidence:           { safety_critical: false, weight: 1.0 }
+  traffic_light_detection_confidence: { safety_critical: true,  weight: 1.0 }
+  traffic_light_state_confidence: { safety_critical: true,  weight: 1.0 }
+  signal_relevance_confidence:    { safety_critical: true,  weight: 1.0 }
+  map_alignment_confidence:       { safety_critical: false, weight: 1.0 }
+  synchronization_confidence:     { safety_critical: false, weight: 1.0 }
+  bus_detection_confidence:       { safety_critical: false, weight: 1.0 }
+  behavior_confidence:            { safety_critical: true,  weight: 1.0 }
+
+# Evidence components combined into each field confidence. Weights are
+# normalised over the components that are actually available for a given field;
+# a missing component never silently counts as 1.0.
+components:
+  model_confidence:       { weight: 0.30, description: "Detector / estimator score" }
+  cross_camera_agreement: { weight: 0.20, description: "Agreement across camera views" }
+  map_agreement:          { weight: 0.20, description: "Agreement with HD map topology" }
+  temporal_stability:     { weight: 0.20, description: "Stability of the value across time" }
+  sensor_quality:         { weight: 0.10, description: "Availability and sync quality of inputs" }
+
+# Any field whose confidence is below this value is never auto-selected even if
+# an individual band would otherwise allow it.
+hard_floor: 0.50
+
+# Senior review is mandatory when automation and reviewer disagree on a field
+# marked safety_critical, or when any of these categories produce a finding.
+senior_review_on_categories:
+  - PLANNING
+  - TRAFFIC_CONTROL
+
+# Overall record confidence is reported for triage only. It is the weighted
+# MINIMUM-biased aggregate (harmonic-style) of populated field confidences, so a
+# single weak field cannot be masked by strong ones.
+overall_aggregation: weighted_min_biased

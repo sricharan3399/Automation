@@ -1,0 +1,86 @@
+# ---------------------------------------------------------------------------
+# Redaction policy applied to evidence BEFORE it leaves the approved
+# environment. Raw, unredacted evidence stays inside the approved environment.
+#
+# Regions are expressed in fractional image coordinates (0.0-1.0) so they are
+# resolution independent.
+# ---------------------------------------------------------------------------
+
+version: "1.0.0"
+
+enabled: true
+# Export is refused when redaction is enabled but cannot be applied.
+fail_closed: true
+
+# Rectangular masks burned into exported evidence images.
+image_regions:
+  - name: browser_url_bar
+    applies_to: [screenshot]
+    x: 0.0
+    y: 0.0
+    w: 1.0
+    h: 0.06
+    reason: "Hides internal URLs, tenant names and query strings."
+  - name: user_identity_chip
+    applies_to: [screenshot]
+    x: 0.82
+    y: 0.0
+    w: 0.18
+    h: 0.08
+    reason: "Hides the signed-in user avatar and display name."
+  - name: internal_id_sidebar
+    applies_to: [screenshot]
+    x: 0.0
+    y: 0.08
+    w: 0.16
+    h: 0.92
+    reason: "Hides internal navigation containing dataset and job identifiers."
+  - name: telemetry_gps_overlay
+    applies_to: [camera_frame]
+    x: 0.0
+    y: 0.90
+    w: 0.45
+    h: 0.10
+    reason: "Hides burned-in GPS/position overlays on camera frames."
+
+# Text/metadata scrubbing applied to manifests, JSON and CSV evidence records.
+text_rules:
+  # Precise coordinates are reduced to the configured decimal places.
+  coordinate_precision:
+    enabled: true
+    decimals: 2          # ~1.1 km at the equator
+    fields: [latitude, longitude, lat, lon, gps_lat, gps_lon]
+
+  # Identifiers replaced by a stable, salted, non-reversible reference.
+  pseudonymise_fields:
+    - session_id
+    - event_id
+    - job_ref
+    - vehicle_id
+    - driver_id
+    - operator
+
+  # Regex patterns scanned for in every exported text field. A hit is masked and
+  # reported in the redaction preview.
+  sensitive_patterns:
+    - name: email_address
+      pattern: "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+    - name: ipv4_address
+      pattern: "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"
+    - name: bearer_token
+      pattern: "(?i)bearer\\s+[A-Za-z0-9._\\-]{16,}"
+    - name: api_key_like
+      pattern: "(?i)(api[_-]?key|secret|token|password)\\s*[:=]\\s*\\S{8,}"
+    - name: windows_user_path
+      pattern: "(?i)[A-Z]:\\\\Users\\\\[^\\\\\\s]+"
+    - name: unc_share
+      pattern: "\\\\\\\\[A-Za-z0-9._-]+\\\\[A-Za-z0-9._$-]+"
+    - name: german_plate
+      pattern: "\\b[A-ZÄÖÜ]{1,3}-[A-ZÄÖÜ]{1,2}\\s?\\d{1,4}\\b"
+    - name: vin
+      pattern: "\\b[A-HJ-NPR-Z0-9]{17}\\b"
+
+# Pseudonymisation salt source. NEVER hard-code the salt here.
+# Resolution order: OS credential store -> AV_REDACTION_SALT env var ->
+# per-installation salt generated on first run and stored outside the repo.
+salt_source: "env:AV_REDACTION_SALT"

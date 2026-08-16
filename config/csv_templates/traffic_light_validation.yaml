@@ -1,0 +1,28 @@
+id: traffic_light_validation
+name: "Traffic-Light Validation"
+description: "Signal detection, state and relevance validation at controlled junctions."
+version: "1.0.0"
+
+columns:
+  - { key: canonical_event_key,  header: canonical_event_key,  type: string,   required: true }
+  - { key: anonymized_event_ref, header: anonymized_event_ref, type: string,   required: true }
+  - { key: country_code,         header: country_code,         type: string,   required: true }
+  - { key: intersection_type,    header: intersection_type,    type: string,   required: false, enum: intersection_type }
+  - { key: traffic_control_entity, header: traffic_control_entity, type: list, required: false, enum: traffic_control_entity }
+  - { key: traffic_light_state,  header: traffic_light_state,  type: string,   required: false, enum: traffic_light_state }
+  - { key: traffic_light_detection_confidence, header: traffic_light_detection_confidence, type: confidence, required: false }
+  - { key: traffic_light_state_confidence,     header: traffic_light_state_confidence,     type: confidence, required: false }
+  - { key: signal_relevance_confidence,        header: signal_relevance_confidence,        type: confidence, required: false }
+  - { key: wait_line_crossing_time, header: wait_line_crossing_time, type: datetime, required: false }
+  - { key: junction_entry_time,  header: junction_entry_time,  type: datetime, required: false }
+  - { key: junction_exit_time,   header: junction_exit_time,   type: datetime, required: false }
+  - { key: stop_classification,  header: stop_classification,  type: string,   required: false, enum: stop_classification }
+  - { key: minimum_speed,        header: minimum_speed,        type: float,    required: false }
+  - { key: stop_duration,        header: stop_duration,        type: duration, required: false }
+  - { key: abnormality_categories, header: abnormality_categories, type: list, required: false, enum: abnormality_category }
+  - { key: automation_recommendation, header: automation_recommendation, type: string, required: false }
+  - { key: reviewer_decision,    header: reviewer_decision,    type: string,   required: false }
+  - { key: final_status,         header: final_status,         type: string,   required: true, enum: record_status }
+  - { key: submission_blocking_error_count, header: submission_blocking_error_count, type: int, required: true }
+  - { key: rule_version,         header: rule_version,         type: string,   required: true }
+  - { key: last_updated_at,      header: last_updated_at,      type: datetime, required: true }

@@ -1,0 +1,28 @@
+id: generic_av_event
+name: "Generic AV Event"
+description: "Minimal, source-agnostic event export usable for any scenario."
+version: "1.0.0"
+
+columns:
+  - { key: canonical_event_key,  header: canonical_event_key,  type: string,   required: true }
+  - { key: anonymized_event_ref, header: anonymized_event_ref, type: string,   required: true }
+  - { key: record_version,       header: record_version,       type: int,      required: true }
+  - { key: country,              header: country,              type: string,   required: true }
+  - { key: country_code,         header: country_code,         type: string,   required: true }
+  - { key: city,                 header: city,                 type: string,   required: false }
+  - { key: scenario_type,        header: scenario_type,        type: string,   required: false }
+  - { key: object_type,          header: object_type,          type: list,     required: false, enum: object_type }
+  - { key: road_type,            header: road_type,            type: string,   required: false, enum: road_type }
+  - { key: lane_count,           header: lane_count,           type: int,      required: false }
+  - { key: intersection_type,    header: intersection_type,    type: string,   required: false, enum: intersection_type }
+  - { key: weather,              header: weather,              type: string,   required: false, enum: weather }
+  - { key: lighting,             header: lighting,             type: string,   required: false, enum: lighting }
+  - { key: event_time,           header: event_time,           type: datetime, required: true }
+  - { key: abnormality_categories, header: abnormality_categories, type: list, required: false, enum: abnormality_category }
+  - { key: automation_overall_confidence, header: automation_overall_confidence, type: confidence, required: false }
+  - { key: automation_recommendation,     header: automation_recommendation,     type: string, required: false }
+  - { key: reviewer_decision,    header: reviewer_decision,    type: string,   required: false }
+  - { key: final_status,         header: final_status,         type: string,   required: true, enum: record_status }
+  - { key: submission_blocking_error_count, header: submission_blocking_error_count, type: int, required: true }
+  - { key: rule_version,         header: rule_version,         type: string,   required: true }
+  - { key: last_updated_at,      header: last_updated_at,      type: datetime, required: true }

@@ -1,0 +1,317 @@
+{
+  "schema": "av-scout-golden-dataset/1.0",
+  "synthetic": true,
+  "description": "Deterministic synthetic fixtures covering easy cases, difficult cases, every intersection category and every blocking validation rule.",
+  "event_count": 25,
+  "events": [
+    {
+      "event_id": "EVT-0001",
+      "file": "EVT-0001.json",
+      "difficulty": "easy",
+      "country_code": "DE",
+      "injected_faults": [],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0002",
+      "file": "EVT-0002.json",
+      "difficulty": "easy",
+      "country_code": "DE",
+      "injected_faults": [],
+      "intersection": "four_way",
+      "turn": "right",
+      "stop_type": "full",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0003",
+      "file": "EVT-0003.json",
+      "difficulty": "easy",
+      "country_code": "DE",
+      "injected_faults": [],
+      "intersection": "three_way_t_junction",
+      "turn": "left",
+      "stop_type": "full",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0004",
+      "file": "EVT-0004.json",
+      "difficulty": "moderate",
+      "country_code": "DE",
+      "injected_faults": [],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "rolling",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0005",
+      "file": "EVT-0005.json",
+      "difficulty": "moderate",
+      "country_code": "DE",
+      "injected_faults": [],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0006",
+      "file": "EVT-0006.json",
+      "difficulty": "moderate",
+      "country_code": "DE",
+      "injected_faults": [],
+      "intersection": "highway_ramp",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0007",
+      "file": "EVT-0007.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [],
+      "intersection": "roundabout",
+      "turn": "right",
+      "stop_type": "rolling",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0008",
+      "file": "EVT-0008.json",
+      "difficulty": "easy",
+      "country_code": "FR",
+      "injected_faults": [],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0009",
+      "file": "EVT-0009.json",
+      "difficulty": "easy",
+      "country_code": "NL",
+      "injected_faults": [],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0010",
+      "file": "EVT-0010.json",
+      "difficulty": "blocking",
+      "country_code": "DE",
+      "injected_faults": [
+        "missing_vehicle_state"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0011",
+      "file": "EVT-0011.json",
+      "difficulty": "blocking",
+      "country_code": "DE",
+      "injected_faults": [
+        "reversed_eval_window"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0012",
+      "file": "EVT-0012.json",
+      "difficulty": "blocking",
+      "country_code": "DE",
+      "injected_faults": [
+        "self_intersecting_polygon"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0013",
+      "file": "EVT-0013.json",
+      "difficulty": "blocking",
+      "country_code": "DE",
+      "injected_faults": [
+        "two_point_polygon"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0014",
+      "file": "EVT-0014.json",
+      "difficulty": "blocking",
+      "country_code": "DE",
+      "injected_faults": [
+        "missing_country_code"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0015",
+      "file": "EVT-0015.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "frozen_camera",
+        "timestamp_gap"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0016",
+      "file": "EVT-0016.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "duplicate_timestamps",
+        "non_monotonic"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0017",
+      "file": "EVT-0017.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "low_localization",
+        "map_misalignment"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0018",
+      "file": "EVT-0018.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "track_id_switch"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0019",
+      "file": "EVT-0019.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "missed_detection"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0020",
+      "file": "EVT-0020.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "track_fragmentation",
+        "wrong_classification"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0021",
+      "file": "EVT-0021.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "no_map_context"
+      ],
+      "intersection": "railroad_crossing",
+      "turn": "straight",
+      "stop_type": "full",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0022",
+      "file": "EVT-0022.json",
+      "difficulty": "moderate",
+      "country_code": "DE",
+      "injected_faults": [],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": false
+    },
+    {
+      "event_id": "EVT-0023",
+      "file": "EVT-0023.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "illegal_signal_transition"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0024",
+      "file": "EVT-0024.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "false_positive"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "none",
+      "reference_data": true
+    },
+    {
+      "event_id": "EVT-0025",
+      "file": "EVT-0025.json",
+      "difficulty": "hard",
+      "country_code": "DE",
+      "injected_faults": [
+        "signal_metadata_mismatch"
+      ],
+      "intersection": "four_way",
+      "turn": "straight",
+      "stop_type": "full",
+      "reference_data": true
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+name: CI
+
+# --------------------------------------------------------------------------
+# This workflow runs on GitHub-hosted runners, which must NEVER be able to
+# reach production AV data. Every job here runs entirely offline against the
+# synthetic golden dataset. Connecting to an internal data source requires an
+# approved self-hosted runner and is deliberately not configured here.
+# --------------------------------------------------------------------------
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Force the offline posture for every job.
+  AV_MODE: production
+  AV_DATASCOUT_ENABLED: 'false'
+  AV_ALLOW_PRODUCTION_SUBMISSION: 'false'
+  AV_REDACTION_SALT: ci-fixed-salt-not-a-secret
+  PYTHONUTF8: '1'
+
+jobs:
+  backend:
+    name: Backend (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Format check (ruff)
+        run: ruff format --check .
+        continue-on-error: true
+
+      - name: Type check (mypy)
+        run: mypy
+        continue-on-error: true
+
+      - name: Regenerate the golden dataset and verify determinism
+        run: |
+          python tests/golden_dataset/generate.py
+          git diff --exit-code --stat tests/golden_dataset || \
+            (echo "::error::The golden dataset generator is not deterministic." && exit 1)
+
+      - name: Unit and integration tests
+        run: pytest -q --cov=backend --cov-report=term-missing
+
+      - name: Headless dry run against the local adapter
+        run: python -m backend.cli run --country DE --object bus --preview-only
+
+      - name: Headless full run and output verification
+        run: |
+          python -m backend.cli init-db
+          python -m backend.cli run --country DE --object bus --execute --limit 5
+          test -f "$(ls -d output/run_* | head -1)/summary.json"
+          test -f "$(ls -d output/run_* | head -1)/validation_report.json"
+          test -f "$(ls -d output/run_* | head -1)/evidence_manifest.csv"
+          test -f "$(ls -d output/run_* | head -1)/audit.jsonl"
+
+      - name: Verify no secrets are committed
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$|\.pem$|\.p12$|_rsa$'; then
+            echo "::error::A credential-like file is tracked in git."
+            exit 1
+          fi
+
+  dashboard:
+    name: Dashboard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install --no-audit --no-fund
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Dependency audit
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit -r requirements.txt --strict || true
+
+      - name: Static security analysis
+        run: |
+          pip install bandit
+          bandit -r backend -ll -x backend/connectors/synthetic.py
+
+      - name: Check that AV media is not committed
+        run: |
+          if git ls-files | grep -Ei '\.(mp4|avi|mkv|h264|pcap|bag|mcap|pcd|las|laz)$'; then
+            echo "::error::Raw AV media must never be committed."
+            exit 1
+          fi

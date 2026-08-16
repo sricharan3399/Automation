@@ -1,0 +1,184 @@
+# ---------------------------------------------------------------------------
+# AV Test Automation Platform - base configuration
+#
+# This file holds NON-SECRET defaults only. Never place API keys, tokens or
+# passwords here (see docs/SECURITY.md).
+#
+# Values here can be overridden by environment variables (AV_* prefix) and by
+# the Administration page at runtime.
+# ---------------------------------------------------------------------------
+
+application:
+  name: "AV Test Automation Platform"
+  short_name: "AV Scout"
+  # Bumped on every release; recorded in every run for reproducibility.
+  software_version: "1.0.0"
+  contract_version: "1.0.0"
+
+server:
+  host: "127.0.0.1"
+  port: 8000
+  open_browser_on_start: true
+  # Front-end dev server origin, allowed for CORS in development only.
+  dev_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+
+mode:
+  # production | demo
+  # production : synthetic data sources are REFUSED.
+  # demo       : synthetic data source is selectable and always labelled DEMO.
+  operating_mode: "production"
+  # The source integration is read-only unless an approved integration is
+  # explicitly enabled by an administrator.
+  source_access_mode: "read_only"
+  allow_production_submission: false
+  allow_browser_automation: false
+  # First execution of any new configuration profile is forced to dry-run.
+  force_dry_run_on_first_execution: true
+
+storage:
+  database_url: "sqlite:///./data/local.db"
+  checkpoint_dir: "./data/checkpoints"
+  cache_dir: "./data/cache"
+  output_dir: "./output"
+  # Runs older than this are candidates for the retention job (never automatic).
+  retention_days: 180
+
+processing:
+  max_events_per_run: 5000
+  page_size: 100
+  worker_concurrency: 4
+  # auto | cpu | gpu
+  compute_device: "auto"
+  # Emit a checkpoint every N processed events.
+  checkpoint_interval: 10
+  # Stop the run when this many consecutive source errors occur.
+  consecutive_error_limit: 10
+
+geometry:
+  # Search radius (metres) around the ego trajectory for candidate junctions.
+  junction_search_radius_m: 150.0
+  # Distance markers automatically timestamped along the approach.
+  distance_markers_m: [200.0, 100.0, 60.0]
+  post_junction_marker_m: 20.0
+  # Minimum polygon area considered plausible for a mapped junction.
+  min_junction_area_m2: 25.0
+  max_junction_area_m2: 40000.0
+  min_polygon_points: 3
+  # Maximum acceptable lateral offset between ego trajectory and map centreline.
+  max_map_alignment_offset_m: 5.0
+  # Trajectory resampling step used for arc-length interpolation.
+  trajectory_resample_step_m: 0.5
+
+synchronization:
+  # Master timeline is built from this stream when available.
+  master_stream_preference: ["vehicle_state", "localization", "can", "camera_front_main"]
+  max_camera_offset_ms: 50.0
+  max_telemetry_offset_ms: 100.0
+  max_timestamp_gap_ms: 200.0
+  # A stream whose payload hash does not change for this long is "frozen".
+  frozen_stream_seconds: 2.0
+  min_stream_availability_pct: 95.0
+  duplicate_timestamp_tolerance_ms: 0.5
+
+perception:
+  # The object class the bus-scenario engines analyse.
+  target_object_type: "bus"
+  # Noise floors, NOT safety thresholds: a discrepancy shorter than this is
+  # treated as detector jitter rather than a reportable candidate finding.
+  min_finding_duration_s: 0.4
+  # Association between a perception detection and a reference annotation.
+  match_iou_threshold: 0.3
+  match_time_tolerance_s: 0.06
+  # Sustained detection confidence below this is reported as INFO only.
+  low_confidence_floor: 0.5
+  low_confidence_min_duration_s: 1.0
+  # Fractional image margin used to define "fully in view".
+  full_view_margin: 0.02
+
+tracking:
+  # A gap longer than this ends a track segment.
+  max_track_gap_s: 0.5
+  # Number of segments for the same object before it counts as fragmented.
+  fragmentation_min_segments: 3
+  # Concurrent tracks overlapping by more than this are treated as duplicates.
+  duplicate_iou_threshold: 0.6
+  # A track ending while the object is still expected to be observable for at
+  # least this long is reported as a track loss.
+  track_loss_min_remaining_s: 1.0
+
+behavior:
+  # Speed at or below which the ego is considered stationary (m/s).
+  stop_speed_threshold_mps: 0.3
+  # Continuous duration below the threshold required for a full stop (s).
+  full_stop_min_duration_s: 1.0
+  # Below the speed threshold but shorter than the full-stop duration.
+  rolling_stop_max_duration_s: 1.0
+  deceleration_threshold_mps2: -0.8
+  acceleration_threshold_mps2: 0.8
+  # Steering magnitude (rad) sustained to classify a turn.
+  turn_steering_threshold_rad: 0.15
+  # Heading change (deg) used to separate straight / turn / u-turn.
+  turn_heading_change_deg: 35.0
+  u_turn_heading_change_deg: 150.0
+
+evidence:
+  enabled: true
+  # Evidence images are only produced when a frame source is available.
+  capture_points:
+    - first_visible
+    - full_view
+    - signal_close_up
+    - before_junction_entry
+    - wait_line_crossing
+    - junction_entry
+    - junction_exit
+    - map_trajectory
+    - telemetry_summary
+    - validation_warnings
+    - final_review
+  image_format: "png"
+  redaction_required_for_export: true
+  hash_algorithm: "sha256"
+
+review:
+  # Human review cannot be disabled from the dashboard.
+  human_review_required: true
+  require_reason_for_override_severities: ["BLOCKING", "CRITICAL", "HIGH"]
+  senior_review_categories: ["SAFETY", "PLANNING", "TRAFFIC_CONTROL"]
+  min_override_reason_chars: 15
+
+export:
+  default_template: "germany_bus_test"
+  encoding: "utf-8-sig"
+  delimiter: ","
+  line_terminator: "\n"
+  # A CSV with unresolved blocking errors can never be exported.
+  block_export_on_blocking_errors: true
+  emit_rejected_records: true
+  preview_rows: 50
+
+audit:
+  enabled: true
+  # Audit records are append-only; the API exposes no delete operation.
+  file_name: "audit.jsonl"
+  include_payload_diff: true
+
+roles:
+  default_role: "tester"
+  available: ["viewer", "tester", "senior_tester", "administrator"]
+
+countries:
+  default: "DE"
+  allowed:
+    - { code: "DE", name: "Germany" }
+    - { code: "FR", name: "France" }
+    - { code: "IT", name: "Italy" }
+    - { code: "ES", name: "Spain" }
+    - { code: "NL", name: "Netherlands" }
+    - { code: "BE", name: "Belgium" }
+    - { code: "CH", name: "Switzerland" }
+    - { code: "AT", name: "Austria" }
+    - { code: "GB", name: "United Kingdom" }
+    - { code: "US", name: "United States" }
