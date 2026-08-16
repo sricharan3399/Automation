@@ -16,6 +16,7 @@ from sqlalchemy import text
 from backend.api.deps import DbSession
 from backend.auth.secrets import keyring_available
 from backend.configstore import get_config_store
+from backend.readiness import build_report
 from backend.settings import PROJECT_ROOT, get_settings
 from backend.version import CONTRACT_VERSION, METHOD_VERSION, SOFTWARE_VERSION
 
@@ -99,6 +100,20 @@ def health(session: DbSession) -> dict[str, Any]:
         "production_submission_enabled": settings.allow_production_submission,
         "database": {"ok": database_ok, "detail": database_detail, "url_scheme": settings.database_url.split(":")[0]},
     }
+
+
+@router.get("/system/production-readiness")
+def production_readiness(session: DbSession) -> dict[str, Any]:
+    """The go-live gate (spec sections 95 and 96).
+
+    Evaluated live on every call. Nothing is cached and no stored "ready" flag
+    exists, so the answer cannot drift away from the actual system state.
+    """
+    report = build_report(session)
+    payload = report.to_dict()
+    payload["evaluated_at"] = datetime.now(timezone.utc).isoformat()
+    payload["software_version"] = SOFTWARE_VERSION
+    return payload
 
 
 @router.get("/system/environment")

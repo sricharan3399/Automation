@@ -58,10 +58,15 @@ export const STATUS_COLOURS: Record<string, string> = {
   REJECTED_BY_TESTER: '#a0aec0',
   BLOCKED_DATA_ERROR: '#fc8181',
   SENIOR_REVIEW_REQUIRED: '#d69e2e',
+  // Only a successful probe is green. CONFIGURED means settings exist and
+  // nothing more; painting it the same green as CONNECTED made an untested
+  // connection read as a healthy one.
   CONNECTED: '#48bb78',
-  CONFIGURED: '#48bb78',
+  CONFIGURED: '#a0aec0',
+  NOT_TESTED: '#a0aec0',
   DISCONNECTED: '#a0aec0',
   NOT_CONFIGURED: '#a0aec0',
+  FIXTURE_DATA: '#d69e2e',
   AUTH_FAILED: '#fc8181',
   DEMO_ONLY: '#d69e2e',
   ERROR: '#fc8181',

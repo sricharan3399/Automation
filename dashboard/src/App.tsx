@@ -1,6 +1,7 @@
 import AdminIcon from '@mui/icons-material/AdminPanelSettings'
 import AnalyticsIcon from '@mui/icons-material/Insights'
 import AuditIcon from '@mui/icons-material/FactCheck'
+import ReadinessIcon from '@mui/icons-material/VerifiedUser'
 import ConnectionsIcon from '@mui/icons-material/Cable'
 import EvidenceIcon from '@mui/icons-material/PhotoLibrary'
 import ExplorerIcon from '@mui/icons-material/TableView'
@@ -52,6 +53,7 @@ import {
   AuditLogs,
   ConfigurationProfiles,
   EvidenceViewer,
+  ProductionReadiness,
   QualityAnalytics,
   SystemHealth,
 } from '@/pages/misc'
@@ -85,6 +87,12 @@ const NAV: NavItem[] = [
   { path: '/profiles', label: 'Configuration Profiles', icon: <ProfilesIcon />, element: <ConfigurationProfiles /> },
   { path: '/audit', label: 'Audit Logs', icon: <AuditIcon />, element: <AuditLogs /> },
   { path: '/system', label: 'System Health', icon: <HealthIcon />, element: <SystemHealth /> },
+  {
+    path: '/readiness',
+    label: 'Production Readiness',
+    icon: <ReadinessIcon />,
+    element: <ProductionReadiness />,
+  },
   { path: '/admin', label: 'Administration', icon: <AdminIcon />, element: <Administration /> },
 ]
 

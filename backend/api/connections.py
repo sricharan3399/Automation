@@ -50,7 +50,13 @@ def _serialise(profile: Any) -> dict[str, Any]:
         "enabled": profile.enabled,
         "configured": bool(profile.settings_json) and profile.last_status != "NOT_CONFIGURED",
         "last_status": profile.last_status,
+        # The attempt and the last success are reported separately on purpose:
+        # a connection that worked this morning and is failing now must not be
+        # able to present itself as healthy (spec section 9).
+        "last_connection_attempt": profile.last_tested_at,
         "last_tested_at": profile.last_tested_at,
+        "last_successful_connection": profile.last_success_at,
+        "authentication_status": profile.auth_status or "NOT_ATTEMPTED",
         "last_latency_ms": profile.last_latency_ms,
         "last_error": profile.last_error,
         "api_version": profile.api_version,

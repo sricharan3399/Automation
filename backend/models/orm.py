@@ -471,8 +471,15 @@ class ConnectionProfile(Base):
     discovered_schema_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     capabilities_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
+    # Health record (spec section 9). `last_tested_at` is the last *attempt*;
+    # `last_success_at` is the last attempt that actually worked. Keeping them
+    # apart is the difference between "we tried five minutes ago" and "it has
+    # been working for five minutes" - a distinction the Connections page has
+    # to be able to draw. No secret value is ever stored here.
     last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_status: Mapped[str] = mapped_column(String(32), default="NOT_CONFIGURED")
+    auth_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     last_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     api_version: Mapped[str | None] = mapped_column(String(32), nullable=True)

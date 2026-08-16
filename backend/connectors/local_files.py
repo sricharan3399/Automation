@@ -67,7 +67,7 @@ from backend.models.contracts import (
     StreamManifestEntry,
     StreamSample,
 )
-from backend.settings import get_settings
+from backend.settings import get_settings, is_fixture_dataset
 
 log = logging.getLogger(__name__)
 
@@ -109,14 +109,40 @@ class LocalFilesAdapter(DataScoutAdapter):
     def __init__(self, settings: dict[str, Any] | None = None) -> None:
         super().__init__(settings)
         configured = (self.settings or {}).get("dataset_dir")
-        self.dataset_dir = Path(configured) if configured else get_settings().local_dataset_dir
+        # May legitimately be None: "no dataset configured" is a real state and
+        # must reach authenticate() intact rather than silently resolving to
+        # some fallback directory.
+        self.dataset_dir: Path | None = (
+            Path(configured) if configured else get_settings().local_dataset_dir
+        )
         # Value is the backing file, or None for in-memory subclasses.
         self._index: dict[str, Any] | None = None
         self._raw_cache: dict[str, dict[str, Any]] = {}
         self._mapping: dict[str, str] | None = None
 
     # -- lifecycle -------------------------------------------------------
+    @property
+    def serves_fixture_data(self) -> bool:
+        """True when this adapter is pointed at the committed test fixtures.
+
+        Reading the fixtures is allowed - the test suite and CI both do it on
+        purpose - but the results are synthetic, so every surface that reports
+        on this connection has to be able to say so. Silence here is what let
+        golden-dataset events be presented as production results.
+        """
+        return is_fixture_dataset(self.dataset_dir)
+
     def authenticate(self) -> None:
+        if self.dataset_dir is None:
+            raise AdapterNotConfigured(
+                "no dataset directory configured",
+                user_message=(
+                    "No local dataset directory is configured.\n\n"
+                    "Set one on the Connections page, or point AV_LOCAL_DATASET_DIR at an "
+                    "approved exported dataset. The platform does not fall back to sample "
+                    "data when a source is unconfigured."
+                ),
+            )
         if not self.dataset_dir.is_dir():
             raise AdapterNotConfigured(
                 f"dataset directory not found: {self.dataset_dir}",
@@ -151,10 +177,20 @@ class LocalFilesAdapter(DataScoutAdapter):
                 ),
                 latency_ms=latency,
             )
+        message = f"{len(index)} events available in {self.dataset_dir}"
+        if self.serves_fixture_data:
+            # Never let a fixture-backed connection read as a production source.
+            message = (
+                f"FIXTURE DATA - NOT REAL AV DATA. {message}\n\n"
+                "This connection is pointed at the repository's committed test "
+                "fixtures. Results derived from it are synthetic and must not be "
+                "treated as production findings. Production Readiness will not "
+                "pass while a fixture dataset is the active event source."
+            )
         return ConnectionStatus(
             connected=True,
             status="CONNECTED",
-            message=f"{len(index)} events available in {self.dataset_dir}",
+            message=message,
             latency_ms=latency,
             api_version="local-fs",
             schema_version=SCHEMA_ID,
@@ -166,7 +202,7 @@ class LocalFilesAdapter(DataScoutAdapter):
         if self._index is not None:
             return self._index
 
-        if not self.dataset_dir.is_dir():
+        if self.dataset_dir is None or not self.dataset_dir.is_dir():
             raise AdapterNotConfigured(f"dataset directory not found: {self.dataset_dir}")
 
         index: dict[str, Any] = {}

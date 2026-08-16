@@ -104,6 +104,7 @@ export const api = {
   health: () => get<Record<string, unknown>>('/health'),
   environment: () => get<Record<string, unknown>>('/system/environment'),
   systemHealth: () => get<Record<string, unknown>>('/system/health'),
+  productionReadiness: () => get<Record<string, unknown>>('/system/production-readiness'),
   home: () => get<Record<string, unknown>>('/home'),
 
   connections: () =>

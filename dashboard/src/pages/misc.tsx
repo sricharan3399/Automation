@@ -584,6 +584,99 @@ export function SystemHealth() {
 }
 
 // ---------------------------------------------------------------------------
+// Production Readiness (spec sections 95 and 96)
+// ---------------------------------------------------------------------------
+type ReadinessCheck = {
+  key: string
+  name: string
+  status: 'PASS' | 'FAIL' | 'WAITING' | 'WARNING'
+  detail: string
+  mandatory: boolean
+  remediation: string | null
+}
+
+/** PASS is the only green. WAITING is not a failure, but it is not readiness either. */
+const READINESS_CHIP: Record<string, string> = {
+  PASS: 'COMPLETED',
+  FAIL: 'FAILED',
+  WAITING: 'PENDING',
+  WARNING: 'PAUSED',
+}
+
+export function ProductionReadiness() {
+  const { data, error, loading, reload } = useApi(() => api.productionReadiness())
+
+  if (loading && !data) return <LoadingBlock label="Evaluating production readiness…" />
+
+  const checks = ((data?.checks ?? []) as ReadinessCheck[]) ?? []
+  const summary = (data?.summary ?? {}) as Record<string, number>
+  const ready = Boolean(data?.production_ready)
+  const nextAction = data?.next_action as string | null
+
+  return (
+    <Box>
+      <PageHeader
+        title="Production Readiness"
+        subtitle="Evaluated live against this installation. No stored flag; nothing is cached."
+        actions={<Button onClick={reload}>RE-EVALUATE</Button>}
+      />
+      <ErrorBanner error={error} onRetry={reload} />
+
+      <Alert severity={ready ? 'success' : 'warning'} sx={{ mb: 2 }}>
+        <strong>PRODUCTION READY: {ready ? 'YES' : 'NO'}</strong>
+        {!ready && nextAction && (
+          <Typography variant="body2" sx={{ mt: 0.5 }}>
+            Next required action: {nextAction}
+          </Typography>
+        )}
+      </Alert>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <SectionCard title="Gate">
+            <Stack direction="row" spacing={4} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+              <Metric label="Passed" value={summary.passed ?? 0} />
+              <Metric label="Failed" value={summary.failed ?? 0} colour={summary.failed ? '#fc8181' : undefined} />
+              <Metric label="Waiting" value={summary.waiting ?? 0} />
+              <Metric label="Warnings" value={summary.warnings ?? 0} />
+            </Stack>
+
+            <Stack spacing={1}>
+              {checks.map((check) => (
+                <Stack key={check.key} direction="row" spacing={1.5} alignItems="flex-start">
+                  <Box sx={{ minWidth: 96 }}>
+                    <StatusChip value={READINESS_CHIP[check.status] ?? 'PENDING'} label={check.status} />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2">
+                      {check.name}
+                      {!check.mandatory && (
+                        <Typography component="span" variant="caption" color="text.secondary">
+                          {' '}
+                          (advisory)
+                        </Typography>
+                      )}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      {check.detail}
+                    </Typography>
+                    {check.status !== 'PASS' && check.remediation && (
+                      <Typography variant="caption" sx={{ display: 'block', color: 'warning.main' }}>
+                        → {check.remediation}
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
+              ))}
+            </Stack>
+          </SectionCard>
+        </Grid>
+      </Grid>
+    </Box>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Administration
 // ---------------------------------------------------------------------------
 export function Administration() {

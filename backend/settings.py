@@ -143,7 +143,12 @@ class Settings(BaseModel):
 
     # --- adapters -------------------------------------------------------
     data_scout: DataScoutSettings = Field(default_factory=DataScoutSettings)
-    local_dataset_dir: Path = PROJECT_ROOT / "tests" / "golden_dataset"
+    # Deliberately has NO default. A default pointing at tests/golden_dataset
+    # made the local-files adapter serve test fixtures as production events
+    # whenever nobody had configured a real source - the platform's worst
+    # possible failure mode, because the fabricated results were indistinguish-
+    # able from real ones downstream. An unset source is an unset source.
+    local_dataset_dir: Path | None = None
     map_service_url: str | None = None
     object_store_url: str | None = None
 
@@ -261,6 +266,41 @@ def _resolve_path(value: str | Path, default: Path) -> Path:
     return path if path.is_absolute() else (PROJECT_ROOT / path).resolve()
 
 
+def _optional_path(value: str | Path) -> Path | None:
+    """Resolve a path, or ``None`` when nothing was configured.
+
+    Distinct from :func:`_resolve_path` because for a data source "unset" is a
+    meaningful state that must survive to the adapter, rather than collapsing
+    into some fallback directory.
+    """
+    if value in (None, ""):
+        return None
+    path = Path(str(value))
+    return path if path.is_absolute() else (PROJECT_ROOT / path).resolve()
+
+
+# The committed test fixtures. Reading these is legitimate - the suite and CI
+# both do it deliberately - but a dataset served from here is never real AV
+# data, so anything pointed at it must say so rather than present the results
+# as production output.
+FIXTURE_ROOT = PROJECT_ROOT / "tests"
+
+
+def is_fixture_dataset(path: Path | str | None) -> bool:
+    """True when ``path`` lies inside the repository's test-fixture tree."""
+    if path is None:
+        return False
+    try:
+        resolved = Path(path).resolve()
+    except (OSError, ValueError):
+        return False
+    try:
+        resolved.relative_to(FIXTURE_ROOT.resolve())
+    except ValueError:
+        return False
+    return True
+
+
 def build_settings() -> Settings:
     """Compose settings from YAML + environment."""
     load_dotenv()
@@ -324,9 +364,7 @@ def build_settings() -> Settings:
         local_user=_env_str("AV_LOCAL_USER", "local.tester") or "local.tester",
         local_role=_env_str("AV_LOCAL_ROLE", data.get("roles", {}).get("default_role", "tester")) or "tester",
         data_scout=data_scout,
-        local_dataset_dir=_resolve_path(
-            _env_str("AV_LOCAL_DATASET_DIR", "") or "", PROJECT_ROOT / "tests" / "golden_dataset"
-        ),
+        local_dataset_dir=_optional_path(_env_str("AV_LOCAL_DATASET_DIR", "") or ""),
         map_service_url=_env_str("AV_MAP_SERVICE_URL"),
         object_store_url=_env_str("AV_OBJECT_STORE_URL"),
         raw=data,

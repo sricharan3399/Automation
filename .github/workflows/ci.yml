@@ -23,6 +23,12 @@ env:
   AV_ALLOW_PRODUCTION_SUBMISSION: 'false'
   AV_REDACTION_SALT: ci-fixed-salt-not-a-secret
   PYTHONUTF8: '1'
+  # CI deliberately points the local-files adapter at the committed fixtures.
+  # This is explicit on purpose: the platform no longer defaults to them, so a
+  # run against fixture data only ever happens because someone said so. The
+  # platform reports such a connection as FIXTURE DATA and refuses to call
+  # itself production-ready.
+  AV_LOCAL_DATASET_DIR: ./tests/golden_dataset
 
 jobs:
   backend:

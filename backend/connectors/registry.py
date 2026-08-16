@@ -218,17 +218,46 @@ class ConnectionManager:
         return ConnectionStatus(connected=state == "CONFIGURED", status=state, message=message)
 
     def _record(self, profile: ConnectionProfile, status: ConnectionStatus) -> None:
-        profile.last_tested_at = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        profile.last_tested_at = now
         profile.last_status = status.status
         profile.last_latency_ms = status.latency_ms
         profile.last_error = None if status.connected else status.message
         profile.api_version = status.api_version
         profile.schema_version = status.schema_version
         profile.permissions_json = list(status.permissions)
+
+        # Only a successful probe advances the success watermark. A later
+        # failure must not erase the fact that it once worked, nor imply it is
+        # working now - which is exactly what a single timestamp would do.
+        if status.connected:
+            profile.last_success_at = now
+        profile.auth_status = _auth_status_for(status)
         self.session.add(profile)
 
     def test_all(self) -> dict[str, ConnectionStatus]:
         return {p.connection_id: self.test(p.connection_id) for p in self.profiles()}
+
+
+# Derived from the probe result rather than stored separately, so the two can
+# never disagree. Never holds a credential - only the outcome of using one.
+_AUTH_STATUS_BY_PROBE: dict[str, str] = {
+    "CONNECTED": "AUTHENTICATED",
+    "AUTH_FAILED": "AUTHENTICATION_FAILED",
+    "PERMISSION_DENIED": "PERMISSION_DENIED",
+    "NOT_CONFIGURED": "NOT_ATTEMPTED",
+    "DEMO_ONLY": "NOT_ATTEMPTED",
+    "NOT_TESTED": "NOT_ATTEMPTED",
+}
+
+
+def _auth_status_for(status: ConnectionStatus) -> str:
+    mapped = _AUTH_STATUS_BY_PROBE.get(status.status)
+    if mapped is not None:
+        return mapped
+    # TIMEOUT, UNAVAILABLE, SCHEMA_ERROR and friends: we genuinely do not know
+    # whether the credential is good, and saying either way would be a guess.
+    return "UNKNOWN"
 
 
 # ---------------------------------------------------------------------------
