@@ -1,5 +1,59 @@
 # Troubleshooting
 
+## Windows deployment scripts
+
+**`SETUP_AND_START.bat` fails at a stage**
+Every failure names the stage, the exact command, the result and the log path,
+and states that the application was not started. Open `.runtime\logs\setup.log`
+and search for the stage name.
+
+**`'SETUP_AND_START.bat' is not recognized`**
+You are not in the repository folder. `cd` into the cloned `Automation` folder
+first, or double-click the file in Explorer. The scripts themselves always
+`cd /d "%~dp0"`, so once one is running its working directory is correct.
+
+**`START_AV_DASHBOARD.bat` says setup has not completed**
+Correct — it deliberately does not perform a first-time install. Run
+`SETUP_AND_START.bat` once on this machine.
+
+**Setup keeps reinstalling everything**
+It should not. Reinstalls are keyed on SHA-256 hashes in
+`.runtime/setup_state.json`. If that file is deleted or unreadable the next run
+rebuilds it, which costs one full install.
+
+**"is not digitally signed" / execution policy errors**
+The BAT files pass `-ExecutionPolicy Bypass` per process. Launch through the BAT
+files rather than invoking the `.ps1` directly. The machine's policy is never
+modified.
+
+**The dashboard did not open but the backend is running**
+The health check passed and only the browser launch failed. Open the URL
+manually; it is printed at the end of the start output.
+
+**`Port 8000 is already in use`**
+Another process holds it. Either stop that process or set `AV_PORT=8010` in
+`.env` — every script reads the port from the same place.
+
+**`STOP_AV_DASHBOARD.bat` says nothing was running that it owns**
+It only stops processes it can positively identify as its own, by recorded PID
+*and* start time *and* image path *and* command line. If the port is still held
+it says so and tells you how to identify the owner, rather than killing an
+unrelated `python.exe`.
+
+**Update refuses to run**
+`UPDATE_AND_START.bat` stops when tracked source files are modified and lists
+them. That is deliberate: it will not run `git reset --hard` or `git clean` on
+your behalf. `git stash push -m "before update"` or commit, then retry.
+
+**A script aborts immediately after a command that clearly worked**
+This was a real bug, now fixed, and worth recognising if you extend the scripts:
+in Windows PowerShell 5.1, redirecting a native command's stderr with `2>&1`
+wraps each line in a `NativeCommandError`, which a `Stop` error preference turns
+into a terminating error. `npm ci` emits deprecation warnings on success and
+`git fetch` writes progress to stderr, so both looked like failures. Use the
+`Invoke-Native` helper in `scripts/common.ps1`, which judges success on the exit
+code alone.
+
 ## Startup
 
 **`Dependencies are not installed`**

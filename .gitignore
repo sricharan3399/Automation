@@ -9,6 +9,9 @@
 # ---------------------------------------------------------------------------
 
 # --- Secrets and credentials ----------------------------------------------
+# Patterns here name DATA files explicitly. A wildcard like `secrets.*` is a
+# trap: it silently excluded backend/auth/secrets.py, so the repository built
+# locally but every fresh clone failed to import.
 .env
 .env.*
 !.env.example
@@ -20,8 +23,14 @@
 *.keystore
 *.ppk
 *.crt
-credentials.*
-secrets.*
+credentials.json
+credentials.yaml
+credentials.yml
+credentials.ini
+secrets.json
+secrets.yaml
+secrets.yml
+secrets.ini
 .npmrc
 .pypirc
 .netrc
@@ -32,22 +41,26 @@ id_ed25519
 config/connections.local.json
 
 # --- Local runtime state (never shared between laptops) --------------------
+# Every entry is ANCHORED with a leading slash so it matches only at the
+# repository root. Unanchored, `evidence/` matched backend/evidence/ and
+# excluded that entire source package.
+#
 # `dir/*` plus a .gitkeep negation: git cannot re-include a file inside a fully
 # ignored directory, so the directory itself must not be ignored outright.
-.runtime/
-data/*
-!data/.gitkeep
-output/*
-!output/.gitkeep
-exports/
-evidence/
-checkpoints/
-recordings/
-datasets/
-logs/
-cache/
-tmp/
-temp/
+/.runtime/
+/data/*
+!/data/.gitkeep
+/output/*
+!/output/.gitkeep
+/exports/
+/evidence/
+/checkpoints/
+/recordings/
+/datasets/
+/logs/
+/cache/
+/tmp/
+/temp/
 
 # --- Runtime databases -----------------------------------------------------
 # A second laptop initialises its own database from the models and seed code.
@@ -79,13 +92,13 @@ temp/
 *.npz
 *.parquet
 *.feather
-raw_sensor/
-camera_frames/
-lidar/
-radar/
-gps/
-telemetry/
-hdmaps/
+/raw_sensor/
+/camera_frames/
+/lidar/
+/radar/
+/gps/
+/telemetry/
+/hdmaps/
 
 # --- Python ----------------------------------------------------------------
 .venv/

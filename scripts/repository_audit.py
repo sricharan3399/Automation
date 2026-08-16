@@ -143,6 +143,20 @@ TEXT_EXTENSIONS = {
 }
 MAX_SCAN_BYTES = 2 * 1024 * 1024
 
+#: Extensions that are source code. An ignored file with one of these is almost
+#: certainly an over-broad ignore rule, not a deliberate exclusion.
+SOURCE_EXTENSIONS = {
+    ".py", ".ts", ".tsx", ".js", ".jsx", ".ps1", ".psm1", ".bat", ".cmd",
+    ".yaml", ".yml", ".toml", ".cfg", ".html", ".css",
+}
+
+#: Directories whose contents are legitimately ignored source-shaped files.
+LEGITIMATELY_IGNORED_ROOTS = (
+    ".venv/", "venv/", "node_modules/", "dashboard/dist/", "dashboard/node_modules/",
+    "build/", "dist/", ".runtime/", "output/", "data/", "htmlcov/",
+    ".mypy_cache/", ".pytest_cache/", ".ruff_cache/", "__pycache__/",
+)
+
 
 @dataclass
 class Finding:
@@ -166,6 +180,7 @@ class AuditReport:
     generated: list[Finding] = field(default_factory=list)
     large_files: list[Finding] = field(default_factory=list)
     credential_files: list[Finding] = field(default_factory=list)
+    ignored_source: list[Finding] = field(default_factory=list)
     scanned_files: int = 0
     git_available: bool = False
 
@@ -173,12 +188,23 @@ class AuditReport:
         return [
             *self.secrets, *self.env_files, *self.av_data, *self.databases,
             *self.generated, *self.large_files, *self.credential_files,
+            *self.ignored_source,
         ]
 
     @property
     def blockers(self) -> list[Finding]:
-        """Findings that are NOT ignored by git and would actually be committed."""
-        return [f for f in self.all_findings() if f.severity == "BLOCK" and not f.ignored_by_git]
+        """Findings that must be resolved before committing.
+
+        Most are things that would be committed and should not be. The
+        ``ignored_source`` findings are the mirror image: source files that
+        would NOT be committed and must be. Both break the repository, so both
+        block.
+        """
+        return [
+            f
+            for f in self.all_findings()
+            if f.severity == "BLOCK" and (not f.ignored_by_git or f.category == "ignored_source")
+        ]
 
     @property
     def reviews(self) -> list[Finding]:
@@ -236,6 +262,15 @@ def ignored_paths(paths: list[str]) -> set[str]:
         for chunk in out.split(b"\0")
         if chunk
     }
+
+
+def ignore_rule_for(path: str) -> str:
+    """Which .gitignore line excluded ``path``, for an actionable message."""
+    code, out = _git(["check-ignore", "-v", "--", path])
+    if code != 0 or not out:
+        return "unknown rule"
+    first = out.decode("utf-8", errors="replace").splitlines()[0]
+    return first.split("\t")[0] if "\t" in first else first
 
 
 def staged_files() -> list[str]:
@@ -398,6 +433,26 @@ def audit(only_staged: bool = False) -> AuditReport:
                         is_ignored, "REVIEW")
             )
 
+        # --- source files that would NOT be committed --------------------------
+        # The mirror image of every other check. An over-broad ignore rule that
+        # silently drops a source file produces a repository that builds locally
+        # and fails on every fresh clone, which is harder to diagnose than an
+        # obviously missing file.
+        if is_ignored and suffix in SOURCE_EXTENSIONS:
+            lowered = rel.lower()
+            if not lowered.startswith(LEGITIMATELY_IGNORED_ROOTS) and ".venv/" not in lowered:
+                if not ENV_FILE_PATTERN.match(path.name):
+                    matched_rule = ignore_rule_for(rel)
+                    report.ignored_source.append(
+                        Finding(
+                            "ignored_source",
+                            rel,
+                            f"source file excluded by .gitignore ({matched_rule})",
+                            True,
+                            "BLOCK",
+                        )
+                    )
+
         # --- secrets -----------------------------------------------------------
         if suffix in TEXT_EXTENSIONS or ENV_FILE_PATTERN.match(path.name):
             for rule, line_number, detail in scan_text_for_secrets(path, rel):
@@ -436,16 +491,32 @@ def print_report(report: AuditReport) -> None:
     print(f"{'Generated Results:':<31}{_count(report.generated)}")
     print(f"{'Large Files:':<31}{_count(report.large_files)}")
     print(f"{'Suspicious Credentials:':<31}{_count(report.credential_files)}")
+    print(f"{'Source Files Wrongly Ignored:':<31}{len(report.ignored_source)}")
     print()
 
     blockers = report.blockers
-    if blockers:
+    unwanted = [f for f in blockers if f.category != "ignored_source"]
+    missing = [f for f in blockers if f.category == "ignored_source"]
+
+    if unwanted:
         print("-" * 49)
-        print("WOULD BE COMMITTED — MUST BE RESOLVED")
+        print("WOULD BE COMMITTED - MUST BE RESOLVED")
         print("-" * 49)
-        for finding in blockers:
+        for finding in unwanted:
             location = f":{finding.line}" if finding.line else ""
             print(f"  [{finding.category}] {finding.path}{location}")
+            print(f"      {finding.detail}")
+        print()
+
+    if missing:
+        print("-" * 49)
+        print("WOULD NOT BE COMMITTED BUT MUST BE")
+        print("-" * 49)
+        print("  An ignore rule is excluding source code. The repository would")
+        print("  build locally and fail on every fresh clone.")
+        print()
+        for finding in missing:
+            print(f"  {finding.path}")
             print(f"      {finding.detail}")
         print()
 
