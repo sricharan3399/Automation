@@ -137,6 +137,48 @@ function Write-StageFailure {
 }
 
 # ---------------------------------------------------------------------------
+# Running native commands
+# ---------------------------------------------------------------------------
+<#
+Run a native executable, tee its combined output to the log, and return its
+real exit code.
+
+This exists because of a specific Windows PowerShell 5.1 behaviour: redirecting
+a native command's stderr with `2>&1` wraps every stderr line in an ErrorRecord
+(NativeCommandError). Under `$ErrorActionPreference = 'Stop'` that becomes a
+terminating error — so a mere deprecation warning from `npm ci`, or ordinary
+progress output from `git fetch`, would abort the whole script even though the
+command succeeded.
+
+Exit code is the only reliable success signal for a native command, so that is
+what this returns.
+#>
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$Action,
+        [string]$LogPath,
+        [switch]$Quiet
+    )
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $global:LASTEXITCODE = 0
+        if ($LogPath) {
+            if ($Quiet) {
+                & $Action 2>&1 | Tee-Object -FilePath $LogPath -Append | Out-Null
+            } else {
+                & $Action 2>&1 | Tee-Object -FilePath $LogPath -Append | Out-Host
+            }
+        } else {
+            if ($Quiet) { & $Action 2>&1 | Out-Null } else { & $Action 2>&1 | Out-Host }
+        }
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Runtime directories
 # ---------------------------------------------------------------------------
 function Initialize-RuntimeDirectories {

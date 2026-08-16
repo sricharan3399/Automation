@@ -75,8 +75,10 @@ Write-Ok 'Working tree is clean'
 # 3. Fetch
 # ---------------------------------------------------------------------------
 Write-Stage '3/8  Fetching from origin'
-git fetch origin 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Host
-if ($LASTEXITCODE -ne 0) {
+# Invoke-Native, not `2>&1`: git writes progress to stderr on a fully successful
+# fetch, and under $ErrorActionPreference='Stop' that would abort the update.
+$fetchCode = Invoke-Native -Action { git fetch origin } -LogPath $logFile
+if ($fetchCode -ne 0) {
     Write-StageFailure -Stage 'Update' -Command 'git fetch origin' `
         -Detail 'Could not reach the remote. Check the network, the VPN, and your Git credentials.'
     exit 1
@@ -84,8 +86,10 @@ if ($LASTEXITCODE -ne 0) {
 
 $localCommit = (git rev-parse HEAD).Trim()
 $remoteRef = "origin/$branch"
-git rev-parse --verify $remoteRef 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) {
+# Same stderr trap: `git rev-parse --verify` writes to stderr when the ref is
+# absent, which is the exact case this branch is testing for.
+$verifyCode = Invoke-Native -Action { git rev-parse --verify $remoteRef } -Quiet
+if ($verifyCode -ne 0) {
     Write-WarnMsg "Branch '$branch' does not exist on origin. Nothing to update."
     if (-not $NoStart) { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'start_dashboard.ps1') }
     exit $LASTEXITCODE
@@ -101,8 +105,8 @@ if ($localCommit -eq $remoteCommit) {
 
     Write-Stage '4/8  Pulling changes'
     # --ff-only: never create a surprise merge commit on a tester's machine.
-    git pull --ff-only origin $branch 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Host
-    if ($LASTEXITCODE -ne 0) {
+    $pullCode = Invoke-Native -Action { git pull --ff-only origin $branch } -LogPath $logFile
+    if ($pullCode -ne 0) {
         Write-StageFailure -Stage 'Update' -Command "git pull --ff-only origin $branch" `
             -Detail 'The local branch has diverged from origin and cannot fast-forward. Resolve it manually; this script will not rewrite your history.'
         exit 1
@@ -135,9 +139,9 @@ if ($pythonHash -ne $storedPythonHash) {
     Write-Host '    Python dependencies changed; reinstalling' -ForegroundColor Gray
     $requirements = 'requirements-dev.txt'
     if (-not (Test-Path (Join-Path (Get-RepoRoot) $requirements))) { $requirements = 'requirements.txt' }
-    & $venvPython -m pip install -r $requirements --disable-pip-version-check 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        Write-StageFailure -Stage 'Python dependencies' -Command "pip install -r $requirements" -Detail "Exit code $LASTEXITCODE"
+    $pipCode = Invoke-Native -Action { & $venvPython -m pip install -r $requirements --disable-pip-version-check } -LogPath $logFile
+    if ($pipCode -ne 0) {
+        Write-StageFailure -Stage 'Python dependencies' -Command "pip install -r $requirements" -Detail "Exit code $pipCode"
         exit 1
     }
     $state.hashes['python'] = $pythonHash
@@ -157,10 +161,14 @@ if ($npm -and (Test-Path (Join-Path $dashboardDir 'package.json'))) {
         Write-Host '    Dashboard lockfile changed; reinstalling' -ForegroundColor Gray
         Push-Location $dashboardDir
         try {
-            if (Test-Path 'package-lock.json') { npm ci --no-audit --no-fund } else { npm install --no-audit --no-fund }
+            if (Test-Path 'package-lock.json') {
+                $npmCode = Invoke-Native -Action { npm ci --no-audit --no-fund } -LogPath $logFile
+            } else {
+                $npmCode = Invoke-Native -Action { npm install --no-audit --no-fund } -LogPath $logFile
+            }
         } finally { Pop-Location }
-        if ($LASTEXITCODE -ne 0) {
-            Write-StageFailure -Stage 'Dashboard dependencies' -Command 'npm ci' -Detail "Exit code $LASTEXITCODE"
+        if ($npmCode -ne 0) {
+            Write-StageFailure -Stage 'Dashboard dependencies' -Command 'npm ci' -Detail "Exit code $npmCode"
             exit 1
         }
         $state.hashes['node'] = $nodeHash
@@ -187,9 +195,9 @@ if (Test-Path $databaseFile) {
 }
 # init-db is idempotent: it creates missing tables and seeds absent built-ins,
 # and never overwrites existing rows.
-& $venvPython -m backend.cli init-db 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-StageFailure -Stage 'Database migration' -Command 'python -m backend.cli init-db' -Detail "Exit code $LASTEXITCODE"
+$dbCode = Invoke-Native -Action { & $venvPython -m backend.cli init-db } -LogPath $logFile -Quiet
+if ($dbCode -ne 0) {
+    Write-StageFailure -Stage 'Database migration' -Command 'python -m backend.cli init-db' -Detail "Exit code $dbCode"
     exit 1
 }
 Write-Ok 'Database schema is current'
@@ -203,9 +211,9 @@ if ($npm -and (Test-Path (Join-Path $dashboardDir 'package.json'))) {
     if ($sourceHash -ne $storedSourceHash -or -not (Test-Path $distIndex)) {
         Write-Host '    Dashboard sources changed; rebuilding' -ForegroundColor Gray
         Push-Location $dashboardDir
-        try { npm run build } finally { Pop-Location }
-        if ($LASTEXITCODE -ne 0) {
-            Write-StageFailure -Stage 'Frontend build' -Command 'npm run build' -Detail "Exit code $LASTEXITCODE"
+        try { $buildCode = Invoke-Native -Action { npm run build } -LogPath $logFile } finally { Pop-Location }
+        if ($buildCode -ne 0) {
+            Write-StageFailure -Stage 'Frontend build' -Command 'npm run build' -Detail "Exit code $buildCode"
             exit 1
         }
         $state.hashes['frontend_src'] = $sourceHash
@@ -220,9 +228,10 @@ if ($npm -and (Test-Path (Join-Path $dashboardDir 'package.json'))) {
 # 8. Smoke test and start
 # ---------------------------------------------------------------------------
 Write-Stage '8/8  Smoke test'
-& $venvPython -c "from backend.main import create_app; create_app(); print('application imports cleanly')" 2>&1 |
-    Tee-Object -FilePath $logFile -Append | Out-Host
-if ($LASTEXITCODE -ne 0) {
+$smokeCode = Invoke-Native -Action {
+    & $venvPython -c "from backend.main import create_app; create_app(); print('application imports cleanly')"
+} -LogPath $logFile
+if ($smokeCode -ne 0) {
     Write-StageFailure -Stage 'Smoke test' -Command 'import backend.main' `
         -Detail 'The updated application does not import cleanly. It was not started.'
     exit 1

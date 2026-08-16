@@ -42,6 +42,10 @@ function Invoke-Step {
     <#
         Run a native command, stream it to the console and the log, and stop the
         whole bootstrap with an explicit failure report if it fails.
+
+        Success is judged on the exit code alone. Tools like npm and git write
+        warnings and progress to stderr on a completely successful run, so
+        treating stderr output as failure would abort valid installs.
     #>
     param(
         [string]$Stage,
@@ -49,9 +53,9 @@ function Invoke-Step {
         [scriptblock]$Action
     )
     Write-Log "RUN: $Display"
-    & $Action 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        Write-StageFailure -Stage $Stage -Command $Display -Detail "Exit code $LASTEXITCODE"
+    $code = Invoke-Native -Action $Action -LogPath $logFile
+    if ($code -ne 0) {
+        Write-StageFailure -Stage $Stage -Command $Display -Detail "Exit code $code"
         exit 1
     }
 }

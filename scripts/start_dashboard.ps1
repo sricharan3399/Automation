@@ -78,8 +78,11 @@ if (-not $state.setup_completed) {
 }
 
 # Fail fast on a broken environment rather than during request handling.
-& $venvPython -c "import fastapi, uvicorn, sqlalchemy, shapely" 2>&1 | Add-Content -Path $logFile -Encoding utf8
-if ($LASTEXITCODE -ne 0) {
+# Invoke-Native, not `2>&1`: a failing import writes a traceback to stderr, which
+# under $ErrorActionPreference='Stop' would abort with a raw PowerShell error
+# instead of the actionable failure report below.
+$importCode = Invoke-Native -Action { & $venvPython -c "import fastapi, uvicorn, sqlalchemy, shapely" } -LogPath $logFile -Quiet
+if ($importCode -ne 0) {
     Write-StageFailure -Stage 'Startup checks' -Command 'import fastapi, uvicorn, sqlalchemy, shapely' `
         -Detail 'Python dependencies are missing or broken. Run SETUP_AND_START.bat to repair the environment.'
     exit 1
@@ -97,8 +100,8 @@ Initialize-RuntimeDirectories | Out-Null
 $databaseFile = Join-Path (Get-RepoRoot) 'data\local.db'
 if (-not (Test-Path $databaseFile)) {
     Write-WarnMsg 'No local database found; initialising it now'
-    & $venvPython -m backend.cli init-db 2>&1 | Add-Content -Path $logFile -Encoding utf8
-    if ($LASTEXITCODE -ne 0) {
+    $initCode = Invoke-Native -Action { & $venvPython -m backend.cli init-db } -LogPath $logFile -Quiet
+    if ($initCode -ne 0) {
         Write-StageFailure -Stage 'Database initialisation' -Command 'python -m backend.cli init-db' `
             -Detail 'The database could not be created.'
         exit 1

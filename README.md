@@ -28,36 +28,42 @@ These are design constraints, not limitations to be worked around later:
 
 ---
 
-## Quick start (Windows)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File install_windows.ps1
-```
-
-Then:
-
-```powershell
-.\.venv\Scripts\python.exe launcher.py
-```
-
-The dashboard opens at <http://localhost:8000>. The API documentation is at
-<http://localhost:8000/api/docs>.
-
-Opening the application never starts a data-source query.
-
-### Manual install
+## New laptop installation
 
 ```bash
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.venv\Scripts\python.exe -m backend.cli init-db
-python tests/golden_dataset/generate.py
-cd dashboard && npm install && npm run build && cd ..
-.venv\Scripts\python.exe launcher.py
+git clone https://github.com/sricharan3399/Automation.git
+cd Automation
+SETUP_AND_START.bat
 ```
 
-Python 3.10+ is supported; 3.11+ is recommended. Node 18+ is needed only to build the
-dashboard — the API works without it.
+Or clone, open the `Automation` folder in Explorer, and double-click
+**SETUP_AND_START.bat**.
+
+That is the whole installation. It validates the machine, creates the virtual
+environment, installs Python and Node dependencies, builds the dashboard,
+initialises the database, creates `.env`, starts the backend, waits for the health
+check, and opens <http://127.0.0.1:8000>.
+
+Nothing in setup contacts a data source.
+
+### After installation
+
+| Task | Double-click |
+|---|---|
+| Start | `START_AV_DASHBOARD.bat` |
+| Stop | `STOP_AV_DASHBOARD.bat` |
+| Update from GitHub | `UPDATE_AND_START.bat` |
+| Run the full test suite | `RUN_TESTS.bat` |
+
+`START_AV_DASHBOARD.bat` does lightweight checks only — no reinstall, no rebuild,
+no database reset. Setup creates a desktop shortcut pointing at it, so daily use
+never means browsing the repository.
+
+**Requirements:** Windows 10/11, Python 3.10+ (3.11+ recommended), Git. Node 18+ is
+needed only to build the dashboard — the API works without it. An NVIDIA GPU is
+optional; nothing in the metadata, geometry, validation or export path needs one.
+
+Full detail: [DEPLOYMENT_WINDOWS.md](docs/DEPLOYMENT_WINDOWS.md).
 
 ---
 
@@ -213,6 +219,35 @@ av-scout connections    # test every configured connection
 av-scout run --country DE --object bus --preview-only
 av-scout run --country DE --object bus --execute --limit 20
 ```
+
+## Health
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+```json
+{ "status": "healthy", "backend": "healthy", "database": "healthy",
+  "dashboard": "built", "version": "1.0.0" }
+```
+
+The startup script polls this endpoint and only opens the browser once it reports
+healthy, so a failed start is never presented as a success.
+
+## Before pushing
+
+```
+RUN_TESTS.bat
+```
+
+Runs the repository security audit, backend tests, lint, type checks, dashboard
+tests and the production build. The audit refuses to pass if a secret, a runtime
+database, raw AV data or generated output would be committed — and it classifies
+findings with `git check-ignore`, so it can never disagree with what `git add`
+would actually stage.
+
+See [GITHUB_SETUP.md](docs/GITHUB_SETUP.md) and
+[RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 
 ---
 

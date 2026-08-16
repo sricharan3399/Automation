@@ -86,6 +86,100 @@ jobs:
             exit 1
           fi
 
+  audit:
+    name: Repository security audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The audit classifies findings with `git check-ignore`, which needs
+          # the real working tree rather than a shallow export.
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Audit the repository
+        run: python scripts/repository_audit.py
+
+      - name: Audit the committed tree as if freshly staged
+        run: |
+          git add -A
+          python scripts/repository_audit.py --staged
+
+      - name: Confirm sensitive paths are ignored
+        run: |
+          set -e
+          for path in .env data/local.db output/results.csv .runtime/setup_state.json secrets.json id_rsa; do
+            if ! git check-ignore -q -- "$path"; then
+              echo "::error::'$path' is NOT ignored by .gitignore"
+              exit 1
+            fi
+          done
+          echo "All sensitive paths are correctly ignored."
+
+  deployment:
+    name: Windows deployment scripts
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: PowerShell syntax check
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem scripts -Filter *.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) {
+              Write-Host "::error::$($_.Name) has $($errors.Count) parse error(s)"
+              $errors | ForEach-Object { Write-Host "  $($_.Message)" }
+              $failed = $true
+            } else {
+              Write-Host "OK  $($_.Name)"
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Environment validation runs
+        shell: pwsh
+        run: .\scripts\validate_environment.ps1
+
+      - name: Headless first-time setup
+        shell: cmd
+        run: SETUP_AND_START.bat -NoStart -NoShortcut -SkipDashboard < NUL
+
+      - name: Verify setup produced a working installation
+        shell: pwsh
+        run: |
+          if (-not (Test-Path '.venv\Scripts\python.exe')) { throw '.venv was not created' }
+          if (-not (Test-Path 'data\local.db'))            { throw 'database was not created' }
+          if (-not (Test-Path '.env'))                     { throw '.env was not created' }
+          if (-not (Test-Path '.runtime\setup_state.json')){ throw 'setup state was not written' }
+          Write-Host 'Setup artefacts present.'
+
+      - name: Start, health check, stop
+        shell: pwsh
+        run: |
+          .\scripts\start_dashboard.ps1 -NoBrowser
+          if ($LASTEXITCODE -ne 0) { throw 'start_dashboard.ps1 failed' }
+          $health = Invoke-RestMethod http://127.0.0.1:8000/health -TimeoutSec 20
+          Write-Host "health: $($health | ConvertTo-Json -Compress)"
+          if ($health.status -ne 'healthy') { throw "unhealthy: $($health.status)" }
+          .\scripts\stop_dashboard.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'stop_dashboard.ps1 failed' }
+
   dashboard:
     name: Dashboard
     runs-on: ubuntu-latest
