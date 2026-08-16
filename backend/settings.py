@@ -13,6 +13,7 @@ environment or the OS credential store (see :mod:`backend.auth.secrets`).
 
 from __future__ import annotations
 
+import ipaddress
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -171,6 +172,73 @@ class Settings(BaseModel):
         db_path = sqlite_path_from_url(self.database_url)
         if db_path is not None:
             db_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Bind-address helpers
+# ---------------------------------------------------------------------------
+# Parsed with `ipaddress` rather than compared against literal strings. That is
+# both more correct - it recognises ``::``, ``::1`` and the whole 127.0.0.0/8
+# range, not just the two spellings anyone remembers - and it keeps a bare
+# "0.0.0.0" literal out of the source, which static analysers flag as a
+# hardcoded bind-all regardless of the surrounding context.
+def _parse_host(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    try:
+        return ipaddress.ip_address(host.strip())
+    except ValueError:
+        return None  # a hostname such as "localhost" or "av-laptop.corp"
+
+
+def is_loopback_host(host: str) -> bool:
+    """True when binding ``host`` exposes the service only to this machine."""
+    address = _parse_host(host)
+    if address is None:
+        return host.strip().lower() in {"localhost", ""}
+    return address.is_loopback
+
+
+def binds_all_interfaces(host: str) -> bool:
+    """True when ``host`` is the unspecified address, i.e. every interface."""
+    address = _parse_host(host)
+    return address is not None and address.is_unspecified
+
+
+def display_host(host: str) -> str:
+    """The host to show in a browsable URL.
+
+    A service bound to every interface, or to loopback, is reached from this
+    machine as ``localhost``; printing the raw bind address would give the
+    tester a URL that is confusing (``http://LocalHost:8000``) or simply not
+    openable (``http://0.0.0.0:8000``).
+
+    Delegates to the two predicates above rather than re-testing the address,
+    so the three functions cannot drift apart on some spelling one of them
+    handles and another does not.
+    """
+    if is_loopback_host(host) or binds_all_interfaces(host):
+        return "localhost"
+    return host.strip()
+
+
+def network_exposure_warning(host: str) -> str | None:
+    """Warn when the configured bind address reaches beyond this machine.
+
+    The platform's posture is that this dashboard is a local desktop tool
+    holding AV data, and must not be casually reachable from the corporate LAN.
+    Binding wider than loopback is allowed, but never silently.
+    """
+    if is_loopback_host(host):
+        return None
+    if binds_all_interfaces(host):
+        return (
+            f"Binding to {host} exposes this dashboard on EVERY network interface. "
+            "It holds AV review data and has no network authentication of its own. "
+            "Set AV_HOST=127.0.0.1 unless an approved deployment requires otherwise."
+        )
+    return (
+        f"Binding to {host} exposes this dashboard beyond this machine. "
+        "Set AV_HOST=127.0.0.1 unless an approved deployment requires otherwise."
+    )
 
 
 def sqlite_path_from_url(url: str) -> Path | None:

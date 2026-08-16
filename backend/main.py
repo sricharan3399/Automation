@@ -27,7 +27,7 @@ from backend.connectors.base import AdapterError
 from backend.database.init_db import initialize_database
 from backend.database.session import session_scope
 from backend.evidence.redaction import RedactionError
-from backend.settings import PROJECT_ROOT, get_settings
+from backend.settings import PROJECT_ROOT, get_settings, network_exposure_warning
 from backend.version import API_PREFIX, CONTRACT_VERSION, SOFTWARE_VERSION
 from backend.workers.progress import get_progress_hub
 
@@ -212,6 +212,12 @@ def main() -> None:  # pragma: no cover - process entry point
     import uvicorn
 
     settings = get_settings()
+    configure_logging(settings.log_level)
+
+    exposure = network_exposure_warning(settings.host)
+    if exposure:
+        log.warning(exposure)
+
     uvicorn.run(
         "backend.main:app",
         host=settings.host,

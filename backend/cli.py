@@ -15,7 +15,7 @@ import time
 import webbrowser
 from typing import Any
 
-from backend.settings import get_settings
+from backend.settings import display_host, get_settings, network_exposure_warning
 from backend.version import SOFTWARE_VERSION
 
 
@@ -40,13 +40,18 @@ def cmd_start(args: argparse.Namespace) -> int:
     port = args.port or settings.port
     initialize_database()
 
-    url = f"http://{'localhost' if host in ('0.0.0.0', '127.0.0.1') else host}:{port}"
+    url = f"http://{display_host(host)}:{port}"
     print(f"AV Test Automation Platform {SOFTWARE_VERSION}")
     print(f"  mode:               {settings.operating_mode}")
     print(f"  source access:      {settings.source_access_mode}")
     print(f"  prod submission:    {'ENABLED' if settings.allow_production_submission else 'DISABLED'}")
     print(f"  dashboard:          {url}")
     print(f"  API docs:           {url}/api/docs")
+
+    exposure = network_exposure_warning(host)
+    if exposure:
+        print(f"\n  WARNING: {exposure}")
+
     print("\nNo data-source query is started automatically.\n")
 
     if not args.no_browser and settings.open_browser_on_start:

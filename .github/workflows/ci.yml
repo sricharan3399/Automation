@@ -230,7 +230,14 @@ jobs:
       - name: Static security analysis
         run: |
           pip install bandit
-          bandit -r backend -ll -x backend/connectors/synthetic.py
+          # Scans scripts/ as well as backend/ - repository_audit.py is itself
+          # security-relevant code. No exclusions: the previous exemption for
+          # connectors/synthetic.py was verified unnecessary, and a narrower
+          # exclusion list is a stronger gate.
+          # -ll gates on MEDIUM and above. The remaining LOW findings are
+          # fixed-argument subprocess calls (nvidia-smi, git) and mypy
+          # type-narrowing asserts that guard no security invariant.
+          bandit -r backend scripts -ll
 
       - name: Check that AV media is not committed
         run: |
